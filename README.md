@@ -7,6 +7,7 @@ A comprehensive web application for building and managing visual organization ch
 - **Multi-Organization Management**: Track multiple customer organizations across different industries
 - **Visual Org Charts**: Interactive, hierarchical organization chart visualization with drag-and-zoom capabilities
 - **Contact Management**: Detailed contact profiles with roles, responsibilities, and project involvement
+- **🆕 Web Scraper**: Ethical web scraper to discover contacts from company websites (blocks LinkedIn/social media)
 - **Industry-Specific Fields**: Tailored data capture for Oil & Gas, Petrochemical, LNG, and EPC sectors
 - **Project Tracking**: Link contacts to maintenance and project-based activities
 - **Export Capabilities**: Export organizational data for analysis and reporting
@@ -106,26 +107,34 @@ Since LinkedIn scraping is prohibited, here are alternative data sources:
 
 ### Recommended Approaches
 
-1. **Manual Data Entry** (Primary Method)
+1. **🆕 Built-in Web Scraper** (NEW!)
+   - Search company websites for contacts
+   - Automatically finds About/Team/Leadership pages
+   - Extracts names, titles, emails, phone numbers
+   - **Blocks LinkedIn and social media** automatically
+   - Respects robots.txt and rate limits
+   - See `SCRAPER-GUIDE.md` for details
+
+2. **Manual Data Entry**
    - Research company websites
    - Review annual reports and SEC filings
    - Check industry association directories
    - Attend industry events and conferences
    - Request organizational charts from clients
 
-2. **Business Intelligence APIs**
+3. **Business Intelligence APIs**
    - **ZoomInfo**: B2B contact and company data
    - **Apollo.io**: Sales intelligence and engagement
    - **Clearbit**: Company and contact enrichment
    - **Lusha**: Business contact information
 
-3. **CRM Integration**
+4. **CRM Integration**
    - Salesforce API
    - HubSpot API
    - Microsoft Dynamics 365
    - Zoho CRM
 
-4. **CSV/Excel Import**
+5. **CSV/Excel Import**
    - Import bulk contact data from spreadsheets
    - Standardized template provided
 
