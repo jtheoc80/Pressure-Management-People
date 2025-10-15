@@ -10,6 +10,8 @@ function Dashboard() {
     byIndustry: {}
   });
   const [recentOrgs, setRecentOrgs] = useState([]);
+  const [openRequests, setOpenRequests] = useState([]);
+  const [providers, setProviders] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,8 +20,14 @@ function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const orgsResponse = await axios.get('/api/organizations');
+      const [orgsResponse, requestsResponse, providersResponse] = await Promise.all([
+        axios.get('/api/organizations'),
+        axios.get('/api/sales-requests?status=open'),
+        axios.get('/api/enrich/providers')
+      ]);
       const orgs = orgsResponse.data;
+      setOpenRequests(requestsResponse.data);
+      setProviders(providersResponse.data || {});
       
       // Calculate statistics
       const industryCount = {};
@@ -115,6 +123,33 @@ function Dashboard() {
       <div className="dashboard-grid">
         <div className="card">
           <div className="card-header">
+            <h2 className="card-title">Action Center</h2>
+            <Link to="/sales-assist" className="btn btn-primary">Sales Assist</Link>
+          </div>
+          <div className="projects-list">
+            {openRequests.length === 0 ? (
+              <div className="empty-state-text">No open requests</div>
+            ) : (
+              openRequests.slice(0, 5).map((r) => (
+                <div key={r.id} className="project-item">
+                  <div className="project-info">
+                    <div className="project-name">{r.title}</div>
+                    <div className="project-meta">
+                      {r.priority && <span className="badge badge-yellow">{r.priority}</span>}
+                      {r.due_date && <span className="badge badge-blue">Due {r.due_date}</span>}
+                    </div>
+                  </div>
+                  {r.org_id && (
+                    <Link to={`/organizations/${r.org_id}`} className="btn btn-secondary btn-sm">View Org</Link>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
             <h2 className="card-title">Industry Distribution</h2>
           </div>
           <div className="industry-list">
@@ -193,6 +228,18 @@ function Dashboard() {
           <li><strong>Track Projects:</strong> Link contacts to maintenance and project-based activities</li>
           <li><strong>Export Data:</strong> Leverage your organizational intelligence for business development</li>
         </ol>
+        <div className="getting-started-list" style={{marginTop: '1rem'}}>
+          <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
+            <Link to="/sales-assist" className="btn btn-primary">Request Research</Link>
+            <Link to="/sales-assist" className="btn btn-secondary">Import CSV</Link>
+            <Link to="/organizations/new" className="btn btn-secondary">Add Organization</Link>
+          </div>
+          <div style={{marginTop: '0.75rem', color: '#6b7280'}}>
+            Enrichment providers: {Object.entries(providers).filter(([,v]) => v).length > 0 ? (
+              Object.entries(providers).filter(([,v]) => v).map(([k]) => k).join(', ')
+            ) : 'none configured'}
+          </div>
+        </div>
       </div>
     </div>
   );

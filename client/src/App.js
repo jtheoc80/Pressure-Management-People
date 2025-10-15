@@ -7,6 +7,7 @@ import OrgChart from './components/OrgChart';
 import AddOrganization from './components/AddOrganization';
 import AddContact from './components/AddContact';
 import Dashboard from './components/Dashboard';
+import SalesAssist from './components/SalesAssist';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
             <Route path="/organizations/:id" element={<OrganizationDetail />} />
             <Route path="/organizations/:id/chart" element={<OrgChart />} />
             <Route path="/organizations/:id/contacts/new" element={<AddContact />} />
+            <Route path="/sales-assist" element={<SalesAssist />} />
           </Routes>
         </main>
       </div>
@@ -44,6 +46,7 @@ function Header() {
         <nav className="nav-menu">
           <Link to="/" className="nav-link">Dashboard</Link>
           <Link to="/organizations" className="nav-link">Organizations</Link>
+          <Link to="/sales-assist" className="nav-link">Sales Assist</Link>
         </nav>
       </div>
     </header>

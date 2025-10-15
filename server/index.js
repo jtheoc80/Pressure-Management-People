@@ -4,6 +4,9 @@ const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const {
+  exportToJSON,
+} = require('./api-integrations');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -77,6 +80,19 @@ function initializeDatabase() {
     PRIMARY KEY (contact_id, project_id),
     FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+  )`);
+
+  // Requests for sales research/help
+  db.run(`CREATE TABLE IF NOT EXISTS sales_requests (
+    id TEXT PRIMARY KEY,
+    org_id TEXT,
+    title TEXT NOT NULL,
+    details TEXT,
+    priority TEXT,
+    status TEXT DEFAULT 'open',
+    due_date TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE SET NULL
   )`);
 }
 
@@ -325,6 +341,205 @@ app.post('/api/contact-projects', (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ============= SALES ASSIST / ENRICHMENT / EXPORT =============
+
+// Show which enrichment providers are configured via env vars
+app.get('/api/enrich/providers', (req, res) => {
+  res.json({
+    clearbit: Boolean(process.env.CLEARBIT_API_KEY),
+    zoominfo: Boolean(process.env.ZOOMINFO_API_KEY),
+    apollo: Boolean(process.env.APOLLO_API_KEY),
+    pdl: Boolean(process.env.PDL_API_KEY),
+  });
+});
+
+// Create a sales help request
+app.post('/api/sales-requests', (req, res) => {
+  const { org_id, title, details, priority, due_date } = req.body;
+  const id = uuidv4();
+
+  db.run(
+    `INSERT INTO sales_requests (id, org_id, title, details, priority, status, due_date)
+     VALUES (?, ?, ?, ?, ?, 'open', ?)` ,
+    [id, org_id || null, title, details || '', priority || 'normal', due_date || null],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ id, org_id, title, details, priority: priority || 'normal', status: 'open', due_date });
+    }
+  );
+});
+
+// List sales help requests
+app.get('/api/sales-requests', (req, res) => {
+  const { status, org_id } = req.query;
+  const params = [];
+  let sql = 'SELECT * FROM sales_requests';
+  const clauses = [];
+  if (status) {
+    clauses.push('status = ?');
+    params.push(status);
+  }
+  if (org_id) {
+    clauses.push('org_id = ?');
+    params.push(org_id);
+  }
+  if (clauses.length) {
+    sql += ' WHERE ' + clauses.join(' AND ');
+  }
+  sql += ' ORDER BY created_at DESC';
+
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
+// Update a sales help request (status, details, etc.)
+app.patch('/api/sales-requests/:id', (req, res) => {
+  const { id } = req.params;
+  const { title, details, priority, status, due_date, org_id } = req.body;
+
+  db.run(
+    `UPDATE sales_requests
+     SET title = COALESCE(?, title),
+         details = COALESCE(?, details),
+         priority = COALESCE(?, priority),
+         status = COALESCE(?, status),
+         due_date = COALESCE(?, due_date),
+         org_id = COALESCE(?, org_id),
+         created_at = created_at
+     WHERE id = ?`,
+    [title || null, details || null, priority || null, status || null, due_date || null, org_id || null, id],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      if (this.changes === 0) {
+        res.status(404).json({ error: 'Request not found' });
+        return;
+      }
+      res.json({ id, title, details, priority, status, due_date, org_id });
+    }
+  );
+});
+
+// Export an organization's account brief as JSON
+app.get('/api/export/org/:id', (req, res) => {
+  const orgId = req.params.id;
+
+  db.get('SELECT * FROM organizations WHERE id = ?', [orgId], (err, orgRow) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    if (!orgRow) {
+      res.status(404).json({ error: 'Organization not found' });
+      return;
+    }
+
+    db.all('SELECT * FROM contacts WHERE org_id = ? ORDER BY level, last_name', [orgId], (err2, contacts) => {
+      if (err2) {
+        res.status(500).json({ error: err2.message });
+        return;
+      }
+      db.all('SELECT * FROM projects WHERE org_id = ? ORDER BY start_date DESC', [orgId], (err3, projects) => {
+        if (err3) {
+          res.status(500).json({ error: err3.message });
+          return;
+        }
+
+        const exportPayload = exportToJSON(orgRow, contacts, projects);
+        res.setHeader('Content-Type', 'application/json');
+        res.json(exportPayload);
+      });
+    });
+  });
+});
+
+// Search People Data Labs for contacts (server-side proxy)
+app.post('/api/enrich/pdl/search', async (req, res) => {
+  try {
+    const apiKey = process.env.PDL_API_KEY;
+    if (!apiKey) {
+      res.status(400).json({ error: 'PDL_API_KEY not configured' });
+      return;
+    }
+
+    const {
+      name,
+      first_name,
+      last_name,
+      company,
+      company_domain,
+      title,
+      seniority,
+      location,
+      country,
+      industry,
+      limit = 10,
+    } = req.body || {};
+
+    const terms = [];
+    const esc = (v) => String(v).replace(/"/g, '\\"');
+    if (name) terms.push(`full_name: "${esc(name)}"`);
+    if (first_name) terms.push(`first_name: "${esc(first_name)}"`);
+    if (last_name) terms.push(`last_name: "${esc(last_name)}"`);
+    if (company_domain) terms.push(`job_company_domain: "${esc(company_domain)}"`);
+    if (company) terms.push(`job_company_name: "${esc(company)}"`);
+    if (title) terms.push(`job_title: "${esc(title)}"`);
+    if (seniority) terms.push(`job_seniority: "${esc(seniority)}"`);
+    if (location) terms.push(`location_name: "${esc(location)}"`);
+    if (country) terms.push(`location_country: "${esc(country)}"`);
+    if (industry) terms.push(`job_industry: "${esc(industry)}"`);
+
+    const query = terms.length ? terms.join(' AND ') : 'job_title: "manager"';
+
+    const pdlResp = await fetch('https://api.peopledatalabs.com/v5/person/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey,
+      },
+      body: JSON.stringify({ query, size: Math.max(1, Math.min(25, Number(limit) || 10)) }),
+    });
+
+    if (!pdlResp.ok) {
+      const text = await pdlResp.text();
+      res.status(pdlResp.status).json({ error: 'pdl_error', detail: text });
+      return;
+    }
+
+    const data = await pdlResp.json();
+    const results = (data?.data || []).map((p) => {
+      const email = p.work_email || (Array.isArray(p.emails) ? (typeof p.emails[0] === 'string' ? p.emails[0] : p.emails[0]?.address) : undefined);
+      const phone = Array.isArray(p.phone_numbers) ? (typeof p.phone_numbers[0] === 'string' ? p.phone_numbers[0] : p.phone_numbers[0]?.number) : undefined;
+      return {
+        first_name: p.first_name || '',
+        last_name: p.last_name || '',
+        full_name: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        title: p.job_title || p.title || null,
+        email: email || null,
+        phone: phone || null,
+        location: p.location_name || p.location || null,
+        company: p.job_company_name || p.company || null,
+        company_domain: p.job_company_domain || p.job_company_website || null,
+        source: 'pdl',
+      };
+    });
+
+    res.json({ total: data?.total || results.length, results });
+  } catch (err) {
+    res.status(500).json({ error: 'server_error', detail: String(err?.message || err) });
+  }
 });
 
 // Start server
