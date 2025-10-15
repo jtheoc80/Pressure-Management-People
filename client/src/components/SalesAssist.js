@@ -228,100 +228,12 @@ function SalesAssist() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Sales Assist</h1>
-          <p className="page-subtitle">Request research, import leads, and export account briefs</p>
+          <p className="page-subtitle">Find hard-to-get contacts fast (PDL)</p>
         </div>
       </div>
 
       <div className="dashboard-grid">
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Create Help Request</h2>
-          </div>
-          <form onSubmit={submitRequest} className="grid-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Organization</label>
-                <select name="org_id" className="form-select" value={form.org_id} onChange={handleChange}>
-                  <option value="">Unassigned</option>
-                  {organizations.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Priority</label>
-                <select name="priority" className="form-select" value={form.priority} onChange={handleChange}>
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Due Date</label>
-                <input type="date" name="due_date" className="form-input" value={form.due_date} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Title *</label>
-              <input name="title" className="form-input" placeholder="e.g., Find Maintenance Manager at ACME LNG" value={form.title} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Details</label>
-              <textarea name="details" rows="4" className="form-textarea" placeholder="Context, ideal persona, constraints..." value={form.details} onChange={handleChange} />
-            </div>
-            <div className="form-actions">
-              <button type="submit" className="btn btn-primary">Submit Request</button>
-            </div>
-          </form>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">CSV Paste Import</h2>
-          </div>
-          <div>
-            <div className="form-group">
-              <label className="form-label">Paste CSV</label>
-              <textarea
-                className="form-textarea"
-                rows="8"
-                placeholder="first_name,last_name,title,department,email,phone,company,industry,sector,location,level\nJane,Doe,Maintenance Manager,Maintenance,jane@example.com,555-555-5555,ACME LNG,LNG,Liquefaction,Houston,1"
-                value={csvText}
-                onChange={(e) => setCsvText(e.target.value)}
-              />
-            </div>
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={parseCsv} disabled={parsingCsv}>Preview</button>
-              <button type="button" className="btn btn-primary" onClick={importCsvRows} disabled={!csvPreview.length}>Import Preview Rows</button>
-            </div>
-            {csvPreview.length > 0 && (
-              <div className="info-card card" style={{ marginTop: '1rem' }}>
-                <h3 className="card-title">Preview (first {csvPreview.length})</h3>
-                <div className="contacts-table">
-                  {csvPreview.map((r, idx) => (
-                    <div key={idx} className="contact-row">
-                      <div className="contact-info">
-                        <div className="contact-name">{r.first_name} {r.last_name}</div>
-                        <div className="contact-details">
-                          {r.title && <span className="contact-detail">{r.title}</span>}
-                          {r.department && <span className="contact-detail">{r.department}</span>}
-                          {r.email && <span className="contact-detail">{r.email}</span>}
-                          {r.phone && <span className="contact-detail">{r.phone}</span>}
-                        </div>
-                        {(r.company || r.organization) && (
-                          <div className="contact-responsibilities">{r.company || r.organization}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
+        <div className="card" style={{gridColumn: '1 / -1'}}>
           <div className="card-header">
             <h2 className="card-title">Find Contacts (PDL)</h2>
             {!providers.pdl && (
@@ -331,21 +243,20 @@ function SalesAssist() {
           <form onSubmit={searchPDL} className="grid-form">
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">Name</label>
-                <input className="form-input" value={pdlQuery.name} onChange={(e) => setPdlQuery({ ...pdlQuery, name: e.target.value })} />
+                <label className="form-label">Organization (save to)</label>
+                <select name="org_id" className="form-select" value={form.org_id} onChange={handleChange}>
+                  <option value="">Select organization...</option>
+                  {organizations.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Company</label>
-                <input className="form-input" value={pdlQuery.company} onChange={(e) => setPdlQuery({ ...pdlQuery, company: e.target.value })} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Domain</label>
+                <label className="form-label">Company domain</label>
                 <input className="form-input" placeholder="acme.com" value={pdlQuery.company_domain} onChange={(e) => setPdlQuery({ ...pdlQuery, company_domain: e.target.value })} />
               </div>
-            </div>
-            <div className="form-row">
               <div className="form-group">
-                <label className="form-label">Title</label>
+                <label className="form-label">Title contains</label>
                 <input className="form-input" value={pdlQuery.title} onChange={(e) => setPdlQuery({ ...pdlQuery, title: e.target.value })} />
               </div>
               <div className="form-group">
