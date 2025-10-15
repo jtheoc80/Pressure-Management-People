@@ -1,0 +1,169 @@
+.org-chart-page {
+  height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.chart-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.chart-container {
+  flex: 1;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.custom-node {
+  background: white;
+  border: 2px solid #1e40af;
+  border-radius: 0.5rem;
+  min-width: 250px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.custom-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.node-header {
+  padding: 0.75rem 1rem;
+  background: #1e40af;
+  color: white;
+  border-radius: 0.375rem 0.375rem 0 0;
+}
+
+.node-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.node-body {
+  padding: 0.875rem 1rem;
+}
+
+.node-title {
+  font-weight: 600;
+  color: #111827;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.node-department {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.node-contact {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-top: 0.375rem;
+}
+
+.node-contact svg {
+  flex-shrink: 0;
+}
+
+.legend-card {
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  border: 1px solid #e5e7eb;
+}
+
+.legend-items {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 0.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* React Flow overrides */
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__minimap {
+  background: #f9fafb;
+  border-radius: 0.5rem;
+}
+
+.react-flow__controls {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.react-flow__controls-button:hover {
+  background: #f3f4f6;
+}
+
+.react-flow__attribution {
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+}
+
+@media (max-width: 768px) {
+  .org-chart-page {
+    height: calc(100vh - 100px);
+  }
+
+  .chart-actions {
+    width: 100%;
+  }
+
+  .chart-actions .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .legend-items {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .custom-node {
+    min-width: 200px;
+  }
+}

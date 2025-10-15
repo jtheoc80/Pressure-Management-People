@@ -1,0 +1,10 @@
+first_name,last_name,title,department,email,phone,location,level,responsibilities,project_types,notes
+Jane,Smith,CEO,Executive Management,jane.smith@example.com,+1-555-0100,Houston TX,0,Overall company strategy and operations,Capital Projects,Primary decision maker
+John,Doe,VP of Operations,Operations,john.doe@example.com,+1-555-0101,Houston TX,1,Plant operations and maintenance oversight,Turnaround/Shutdown,Reports to CEO
+Sarah,Johnson,Director of Maintenance,Maintenance,sarah.j@example.com,+1-555-0102,Houston TX,2,Maintenance planning and execution,Maintenance,20 years experience
+Michael,Brown,Engineering Manager,Engineering,michael.b@example.com,+1-555-0103,Houston TX,2,Project engineering and technical support,Capital Projects,Lead engineer for expansion projects
+Emily,Davis,HSE Director,HSE,emily.davis@example.com,+1-555-0104,Houston TX,1,Health safety and environmental compliance,Safety/Compliance,Key stakeholder for all projects
+Robert,Wilson,Procurement Manager,Procurement,robert.w@example.com,+1-555-0105,Houston TX,2,Strategic sourcing and vendor management,Capital Projects,Manages $50M+ annual spend
+Lisa,Martinez,Project Manager,Projects,lisa.m@example.com,+1-555-0106,Houston TX,2,Capital project execution,Capital Projects,Currently managing debottlenecking project
+David,Anderson,Maintenance Supervisor,Maintenance,david.a@example.com,+1-555-0107,Houston TX,3,Daily maintenance coordination,Maintenance,Direct reports: 15 technicians
+Jennifer,Taylor,Planning Coordinator,Planning & Scheduling,jennifer.t@example.com,+1-555-0108,Houston TX,3,Turnaround planning and scheduling,Turnaround/Shutdown,Expert in SAP PM
