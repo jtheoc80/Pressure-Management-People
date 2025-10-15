@@ -11,6 +11,7 @@ function OrganizationDetail() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('contacts');
+  const [submittingRequest, setSubmittingRequest] = useState(false);
 
   useEffect(() => {
     loadOrganizationData();
@@ -31,6 +32,40 @@ function OrganizationDetail() {
     } catch (error) {
       console.error('Error loading organization data:', error);
       setLoading(false);
+    }
+  };
+
+  const requestHelp = async () => {
+    const title = window.prompt('Describe what you need (e.g., "Find Maintenance Manager")');
+    if (!title) return;
+    setSubmittingRequest(true);
+    try {
+      await axios.post('/api/sales-requests', {
+        org_id: id,
+        title,
+        priority: 'normal'
+      });
+      alert('Request submitted');
+    } catch (e) {
+      alert('Failed to submit request');
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  const exportAccountBrief = async () => {
+    try {
+      const res = await axios.get(`/api/export/org/${id}`);
+      const dataStr = JSON.stringify(res.data, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${organization.name.replace(/\s+/g, '_')}_account_brief.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Export failed');
     }
   };
 
@@ -117,6 +152,21 @@ function OrganizationDetail() {
             </svg>
             View Org Chart
           </Link>
+          <button className="btn btn-secondary" onClick={exportAccountBrief}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export Brief
+          </button>
+          <button className="btn btn-secondary" onClick={requestHelp} disabled={submittingRequest}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18v-6a3 3 0 1 1 6 0" />
+              <circle cx="12" cy="6" r="1" />
+            </svg>
+            {submittingRequest ? 'Submitting...' : 'Request Help'}
+          </button>
         </div>
       </div>
 
