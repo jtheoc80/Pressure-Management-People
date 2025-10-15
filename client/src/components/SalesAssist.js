@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import './Form.css';
@@ -20,9 +20,14 @@ function SalesAssist() {
     company: '',
     company_domain: '',
     title: 'maintenance manager',
+    seniority: '',
     location: '',
     limit: 10,
   });
+
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [selectedIndexes, setSelectedIndexes] = useState(new Set());
+  const [savingBulk, setSavingBulk] = useState(false);
 
   const [form, setForm] = useState({
     org_id: initialOrgId,
@@ -37,6 +42,18 @@ function SalesAssist() {
   const [parsingCsv, setParsingCsv] = useState(false);
 
   useEffect(() => {
+    try {
+      const savedQuery = localStorage.getItem('salesAssist.pdlQuery');
+      if (savedQuery) {
+        const parsed = JSON.parse(savedQuery);
+        setPdlQuery((prev) => ({ ...prev, ...parsed }));
+      }
+      const savedOrgId = localStorage.getItem('salesAssist.orgId');
+      if (savedOrgId) {
+        setForm((prev) => ({ ...prev, org_id: savedOrgId }));
+      }
+    } catch (_) {}
+
     Promise.all([
       axios.get('/api/organizations'),
       axios.get('/api/enrich/providers'),
@@ -50,6 +67,18 @@ function SalesAssist() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('salesAssist.pdlQuery', JSON.stringify(pdlQuery));
+    } catch (_) {}
+  }, [pdlQuery]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('salesAssist.orgId', form.org_id || '');
+    } catch (_) {}
+  }, [form.org_id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -69,12 +98,28 @@ function SalesAssist() {
 
   const searchPDL = async (e) => {
     e.preventDefault();
+    setMessage({ type: '', text: '' });
+    setSelectedIndexes(new Set());
+    if (!pdlQuery.company_domain && !pdlQuery.company) {
+      setMessage({ type: 'warning', text: 'Enter a company domain or company name.' });
+      return;
+    }
+    if (!pdlQuery.title) {
+      setMessage({ type: 'warning', text: 'Enter a target title or use a preset.' });
+      return;
+    }
     setPdlLoading(true);
     try {
       const res = await axios.post('/api/enrich/pdl/search', pdlQuery);
-      setPdlResults(res.data.results || []);
+      const results = res.data.results || [];
+      setPdlResults(results);
+      if (results.length === 0) {
+        setMessage({ type: 'info', text: 'No results. Try broadening the title or removing location.' });
+      } else {
+        setMessage({ type: 'success', text: `Found ${results.length} contact(s).` });
+      }
     } catch (err) {
-      alert('PDL search failed');
+      setMessage({ type: 'error', text: 'PDL search failed. Check your filters or provider configuration.' });
     } finally {
       setPdlLoading(false);
     }
@@ -97,7 +142,7 @@ function SalesAssist() {
         orgId = orgRes.data.id;
       }
       if (!orgId) {
-        alert('Select an organization to save this contact');
+        setMessage({ type: 'warning', text: 'Select an organization to save this contact.' });
         return;
       }
       await axios.post('/api/contacts', {
@@ -115,10 +160,73 @@ function SalesAssist() {
         project_types: '',
         notes: 'Imported from PDL'
       });
-      alert('Contact saved');
+      setMessage({ type: 'success', text: 'Contact saved.' });
     } catch (e) {
-      alert('Failed to save contact');
+      setMessage({ type: 'error', text: 'Failed to save contact.' });
     }
+  };
+
+  const saveSelectedPDLContacts = async () => {
+    if (selectedIndexes.size === 0) {
+      setMessage({ type: 'warning', text: 'Select at least one contact to save.' });
+      return;
+    }
+    if (!form.org_id) {
+      setMessage({ type: 'warning', text: 'Select an organization to save selected contacts.' });
+      return;
+    }
+    setSavingBulk(true);
+    let successCount = 0;
+    try {
+      for (const idx of selectedIndexes) {
+        const person = pdlResults[idx];
+        try {
+          await savePDLContact(person);
+          successCount += 1;
+        } catch (_) {}
+      }
+      setMessage({ type: 'success', text: `Saved ${successCount} contact(s).` });
+      setSelectedIndexes(new Set());
+    } finally {
+      setSavingBulk(false);
+    }
+  };
+
+  const rolePresets = useMemo(
+    () => [
+      { label: 'Maintenance Manager', title: 'maintenance manager', seniority: 'manager' },
+      { label: 'Reliability Engineer', title: 'reliability engineer', seniority: '' },
+      { label: 'Procurement', title: 'procurement', seniority: '' },
+      { label: 'Operations Manager', title: 'operations manager', seniority: 'manager' },
+      { label: 'Plant Manager', title: 'plant manager', seniority: 'manager' },
+    ],
+    []
+  );
+
+  const applyPreset = (preset) => {
+    setPdlQuery((prev) => ({
+      ...prev,
+      title: preset.title,
+      seniority: preset.seniority || prev.seniority || '',
+    }));
+  };
+
+  const toggleSelectAll = (checked) => {
+    if (checked) {
+      const all = new Set(pdlResults.map((_, i) => i));
+      setSelectedIndexes(all);
+    } else {
+      setSelectedIndexes(new Set());
+    }
+  };
+
+  const toggleSelectOne = (index) => {
+    setSelectedIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   };
 
   const parseCsv = () => {
@@ -240,6 +348,20 @@ function SalesAssist() {
               <span className="badge badge-yellow">PDL key not configured</span>
             )}
           </div>
+          {!providers.pdl && (
+            <div className="callout callout-warning" style={{ marginBottom: '1rem' }}>
+              <strong>Provider setup:</strong> Set environment variable <code>PDL_API_KEY</code> and restart the server. Example: <code>export PDL_API_KEY=your_key</code>
+            </div>
+          )}
+          {message.text && (
+            <div className={`callout ${
+              message.type === 'success' ? 'callout-success' :
+              message.type === 'error' ? 'callout-error' :
+              message.type === 'warning' ? 'callout-warning' : 'callout-info'
+            }`}>
+              {message.text}
+            </div>
+          )}
           <form onSubmit={searchPDL} className="grid-form">
             <div className="form-row">
               <div className="form-group">
@@ -254,10 +376,26 @@ function SalesAssist() {
               <div className="form-group">
                 <label className="form-label">Company domain</label>
                 <input className="form-input" placeholder="acme.com" value={pdlQuery.company_domain} onChange={(e) => setPdlQuery({ ...pdlQuery, company_domain: e.target.value })} />
+                <div className="form-hint">Best results if you know the domain.</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Company name</label>
+                <input className="form-input" placeholder="Acme Corporation" value={pdlQuery.company} onChange={(e) => setPdlQuery({ ...pdlQuery, company: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">Title contains</label>
-                <input className="form-input" value={pdlQuery.title} onChange={(e) => setPdlQuery({ ...pdlQuery, title: e.target.value })} />
+                <input className="form-input" placeholder="e.g., maintenance manager" value={pdlQuery.title} onChange={(e) => setPdlQuery({ ...pdlQuery, title: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Seniority</label>
+                <select className="form-select" value={pdlQuery.seniority} onChange={(e) => setPdlQuery({ ...pdlQuery, seniority: e.target.value })}>
+                  <option value="">Any</option>
+                  <option value="manager">Manager</option>
+                  <option value="director">Director</option>
+                  <option value="vp">VP</option>
+                  <option value="cxo">CXO</option>
+                  <option value="owner">Owner</option>
+                </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Location</label>
@@ -268,26 +406,89 @@ function SalesAssist() {
                 <input type="number" className="form-input" value={pdlQuery.limit} onChange={(e) => setPdlQuery({ ...pdlQuery, limit: Number(e.target.value) })} />
               </div>
             </div>
+            <div className="form-group">
+              <label className="form-label">Quick role presets</label>
+              <div className="preset-buttons">
+                {rolePresets.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => applyPreset(p)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary" disabled={pdlLoading}>Search</button>
+              <button type="submit" className="btn btn-primary" disabled={pdlLoading}>
+                {pdlLoading ? 'Searching…' : 'Search'}
+              </button>
+              {pdlResults.length > 0 && (
+                <button type="button" className="btn btn-secondary" onClick={() => { setPdlResults([]); setSelectedIndexes(new Set()); }}>
+                  Clear results
+                </button>
+              )}
             </div>
           </form>
           {pdlResults.length > 0 && (
-            <div className="projects-list">
-              {pdlResults.map((p, idx) => (
-                <div key={idx} className="project-item">
-                  <div className="project-info">
-                    <div className="project-name">{p.full_name}</div>
-                    <div className="project-description">{p.title} {p.company ? `• ${p.company}` : ''}</div>
-                    <div className="project-meta">
-                      {p.email && <span className="badge badge-blue">{p.email}</span>}
-                      {p.phone && <span className="badge badge-green">{p.phone}</span>}
-                      {p.location && <span className="badge badge-purple">{p.location}</span>}
-                    </div>
-                  </div>
-                  <button className="btn btn-secondary btn-sm" onClick={() => savePDLContact(p)}>Save</button>
+            <div>
+              <div className="form-actions" style={{ justifyContent: 'space-between' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                  {selectedIndexes.size} selected
                 </div>
-              ))}
+                <div>
+                  <button className="btn btn-success" onClick={saveSelectedPDLContacts} disabled={savingBulk}>
+                    {savingBulk ? 'Saving…' : 'Save selected'}
+                  </button>
+                </div>
+              </div>
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '36px' }}>
+                        <input
+                          type="checkbox"
+                          aria-label="Select all"
+                          checked={selectedIndexes.size === pdlResults.length}
+                          onChange={(e) => toggleSelectAll(e.target.checked)}
+                        />
+                      </th>
+                      <th>Name</th>
+                      <th>Title</th>
+                      <th>Company</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Location</th>
+                      <th style={{ width: '1%'}}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pdlResults.map((p, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIndexes.has(idx)}
+                            onChange={() => toggleSelectOne(idx)}
+                          />
+                        </td>
+                        <td>{p.full_name}</td>
+                        <td>{p.title || '-'}</td>
+                        <td>{p.company || '-'}</td>
+                        <td>{p.email || '-'}</td>
+                        <td>{p.phone || '-'}</td>
+                        <td>{p.location || '-'}</td>
+                        <td className="table-actions">
+                          <button className="btn btn-secondary btn-sm" onClick={() => savePDLContact(p)}>Save</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
