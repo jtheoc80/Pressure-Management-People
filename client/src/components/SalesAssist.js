@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import './Form.css';
@@ -13,6 +13,16 @@ function SalesAssist() {
   const [providers, setProviders] = useState({});
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pdlResults, setPdlResults] = useState([]);
+  const [pdlLoading, setPdlLoading] = useState(false);
+  const [pdlQuery, setPdlQuery] = useState({
+    name: '',
+    company: '',
+    company_domain: '',
+    title: 'maintenance manager',
+    location: '',
+    limit: 10,
+  });
 
   const [form, setForm] = useState({
     org_id: initialOrgId,
@@ -54,6 +64,60 @@ function SalesAssist() {
       setForm({ org_id: initialOrgId, title: '', details: '', priority: 'normal', due_date: '' });
     } catch (err) {
       alert('Failed to submit request');
+    }
+  };
+
+  const searchPDL = async (e) => {
+    e.preventDefault();
+    setPdlLoading(true);
+    try {
+      const res = await axios.post('/api/enrich/pdl/search', pdlQuery);
+      setPdlResults(res.data.results || []);
+    } catch (err) {
+      alert('PDL search failed');
+    } finally {
+      setPdlLoading(false);
+    }
+  };
+
+  const savePDLContact = async (person) => {
+    try {
+      let orgId = form.org_id;
+      if (!orgId) {
+        const match = organizations.find((o) => o.name?.toLowerCase() === (person.company || '').toLowerCase());
+        orgId = match?.id || null;
+      }
+      if (!orgId && person.company) {
+        const orgRes = await axios.post('/api/organizations', {
+          name: person.company,
+          industry: 'Oil & Gas',
+          sector: '',
+          location: person.location || ''
+        });
+        orgId = orgRes.data.id;
+      }
+      if (!orgId) {
+        alert('Select an organization to save this contact');
+        return;
+      }
+      await axios.post('/api/contacts', {
+        org_id: orgId,
+        first_name: person.first_name || person.full_name?.split(' ')[0] || '',
+        last_name: person.last_name || person.full_name?.split(' ').slice(1).join(' ') || '',
+        title: person.title || '',
+        department: '',
+        email: person.email || '',
+        phone: person.phone || '',
+        location: person.location || '',
+        parent_id: null,
+        level: 0,
+        responsibilities: '',
+        project_types: '',
+        notes: 'Imported from PDL'
+      });
+      alert('Contact saved');
+    } catch (e) {
+      alert('Failed to save contact');
     }
   };
 
@@ -255,6 +319,66 @@ function SalesAssist() {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Find Contacts (PDL)</h2>
+            {!providers.pdl && (
+              <span className="badge badge-yellow">PDL key not configured</span>
+            )}
+          </div>
+          <form onSubmit={searchPDL} className="grid-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Name</label>
+                <input className="form-input" value={pdlQuery.name} onChange={(e) => setPdlQuery({ ...pdlQuery, name: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Company</label>
+                <input className="form-input" value={pdlQuery.company} onChange={(e) => setPdlQuery({ ...pdlQuery, company: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Domain</label>
+                <input className="form-input" placeholder="acme.com" value={pdlQuery.company_domain} onChange={(e) => setPdlQuery({ ...pdlQuery, company_domain: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Title</label>
+                <input className="form-input" value={pdlQuery.title} onChange={(e) => setPdlQuery({ ...pdlQuery, title: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Location</label>
+                <input className="form-input" value={pdlQuery.location} onChange={(e) => setPdlQuery({ ...pdlQuery, location: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Limit</label>
+                <input type="number" className="form-input" value={pdlQuery.limit} onChange={(e) => setPdlQuery({ ...pdlQuery, limit: Number(e.target.value) })} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="submit" className="btn btn-primary" disabled={pdlLoading}>Search</button>
+            </div>
+          </form>
+          {pdlResults.length > 0 && (
+            <div className="projects-list">
+              {pdlResults.map((p, idx) => (
+                <div key={idx} className="project-item">
+                  <div className="project-info">
+                    <div className="project-name">{p.full_name}</div>
+                    <div className="project-description">{p.title} {p.company ? `• ${p.company}` : ''}</div>
+                    <div className="project-meta">
+                      {p.email && <span className="badge badge-blue">{p.email}</span>}
+                      {p.phone && <span className="badge badge-green">{p.phone}</span>}
+                      {p.location && <span className="badge badge-purple">{p.location}</span>}
+                    </div>
+                  </div>
+                  <button className="btn btn-secondary btn-sm" onClick={() => savePDLContact(p)}>Save</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

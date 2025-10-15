@@ -351,6 +351,7 @@ app.get('/api/enrich/providers', (req, res) => {
     clearbit: Boolean(process.env.CLEARBIT_API_KEY),
     zoominfo: Boolean(process.env.ZOOMINFO_API_KEY),
     apollo: Boolean(process.env.APOLLO_API_KEY),
+    pdl: Boolean(process.env.PDL_API_KEY),
   });
 });
 
@@ -462,6 +463,83 @@ app.get('/api/export/org/:id', (req, res) => {
       });
     });
   });
+});
+
+// Search People Data Labs for contacts (server-side proxy)
+app.post('/api/enrich/pdl/search', async (req, res) => {
+  try {
+    const apiKey = process.env.PDL_API_KEY;
+    if (!apiKey) {
+      res.status(400).json({ error: 'PDL_API_KEY not configured' });
+      return;
+    }
+
+    const {
+      name,
+      first_name,
+      last_name,
+      company,
+      company_domain,
+      title,
+      seniority,
+      location,
+      country,
+      industry,
+      limit = 10,
+    } = req.body || {};
+
+    const terms = [];
+    const esc = (v) => String(v).replace(/"/g, '\\"');
+    if (name) terms.push(`full_name: "${esc(name)}"`);
+    if (first_name) terms.push(`first_name: "${esc(first_name)}"`);
+    if (last_name) terms.push(`last_name: "${esc(last_name)}"`);
+    if (company_domain) terms.push(`job_company_domain: "${esc(company_domain)}"`);
+    if (company) terms.push(`job_company_name: "${esc(company)}"`);
+    if (title) terms.push(`job_title: "${esc(title)}"`);
+    if (seniority) terms.push(`job_seniority: "${esc(seniority)}"`);
+    if (location) terms.push(`location_name: "${esc(location)}"`);
+    if (country) terms.push(`location_country: "${esc(country)}"`);
+    if (industry) terms.push(`job_industry: "${esc(industry)}"`);
+
+    const query = terms.length ? terms.join(' AND ') : 'job_title: "manager"';
+
+    const pdlResp = await fetch('https://api.peopledatalabs.com/v5/person/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey,
+      },
+      body: JSON.stringify({ query, size: Math.max(1, Math.min(25, Number(limit) || 10)) }),
+    });
+
+    if (!pdlResp.ok) {
+      const text = await pdlResp.text();
+      res.status(pdlResp.status).json({ error: 'pdl_error', detail: text });
+      return;
+    }
+
+    const data = await pdlResp.json();
+    const results = (data?.data || []).map((p) => {
+      const email = p.work_email || (Array.isArray(p.emails) ? (typeof p.emails[0] === 'string' ? p.emails[0] : p.emails[0]?.address) : undefined);
+      const phone = Array.isArray(p.phone_numbers) ? (typeof p.phone_numbers[0] === 'string' ? p.phone_numbers[0] : p.phone_numbers[0]?.number) : undefined;
+      return {
+        first_name: p.first_name || '',
+        last_name: p.last_name || '',
+        full_name: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        title: p.job_title || p.title || null,
+        email: email || null,
+        phone: phone || null,
+        location: p.location_name || p.location || null,
+        company: p.job_company_name || p.company || null,
+        company_domain: p.job_company_domain || p.job_company_website || null,
+        source: 'pdl',
+      };
+    });
+
+    res.json({ total: data?.total || results.length, results });
+  } catch (err) {
+    res.status(500).json({ error: 'server_error', detail: String(err?.message || err) });
+  }
 });
 
 // Start server
