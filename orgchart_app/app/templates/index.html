@@ -37,6 +37,23 @@
       </section>
 
       <section class="panel">
+        <h2>🔍 Web Scraper - Find Contacts</h2>
+        <p style="font-size: 0.9em; color: #666;">
+          Search company websites for contact information. 
+          <strong>Does NOT scrape LinkedIn or social media.</strong>
+        </p>
+        <form id="scraper-form">
+          <input name="url" type="url" placeholder="https://company.com" required />
+          <label style="display: block; margin: 10px 0;">
+            <input name="max_pages" type="number" min="1" max="5" value="3" style="width: 60px;" />
+            Max pages to check
+          </label>
+          <button type="submit">Search Contacts</button>
+        </form>
+        <div id="scraper-results" style="margin-top: 15px;"></div>
+      </section>
+
+      <section class="panel">
         <h2>Org Chart</h2>
         <div class="controls">
           <label>

@@ -22,6 +22,7 @@ def create_app() -> Flask:
     from .api.projects import bp as projects_bp
     from .api.departments import bp as departments_bp
     from .api.enrich import bp as enrich_bp
+    from .api.scraper import scraper_bp
 
     app.register_blueprint(org_bp)
     app.register_blueprint(people_bp)
@@ -30,6 +31,7 @@ def create_app() -> Flask:
     app.register_blueprint(projects_bp)
     app.register_blueprint(departments_bp)
     app.register_blueprint(enrich_bp)
+    app.register_blueprint(scraper_bp, url_prefix='/api/scraper')
 
     @app.get("/")
     def index():

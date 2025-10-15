@@ -46,6 +46,61 @@ async function uploadCSV(form) {
   alert(`Imported ${j.created.length}, errors ${j.errors.length}`);
 }
 
+async function searchContacts(form) {
+  const resultsDiv = document.getElementById('scraper-results');
+  resultsDiv.innerHTML = '<p style="color: #666;">⏳ Searching for contacts... This may take a few seconds.</p>';
+  
+  const data = Object.fromEntries(new FormData(form));
+  
+  try {
+    const response = await fetch('/api/scraper/search-contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: data.url,
+        max_pages: parseInt(data.max_pages) || 3
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      if (result.prohibited) {
+        resultsDiv.innerHTML = `<p style="color: #dc2626;">❌ ${result.error}</p>`;
+      } else {
+        resultsDiv.innerHTML = `<p style="color: #dc2626;">Error: ${result.error}</p>`;
+      }
+      return;
+    }
+    
+    if (result.contacts && result.contacts.length > 0) {
+      let html = `<p style="color: #16a34a;">✅ Found ${result.total_found} contact(s) from ${result.pages_checked} page(s)</p>`;
+      html += '<div style="max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; margin-top: 10px;">';
+      
+      result.contacts.forEach((contact, index) => {
+        html += `
+          <div style="padding: 10px; margin-bottom: 10px; background: #f9fafb; border-radius: 4px; border-left: 3px solid #3b82f6;">
+            <strong>${contact.name || 'Unknown'}</strong>
+            ${contact.title ? `<br><span style="color: #6b7280;">${contact.title}</span>` : ''}
+            ${contact.email ? `<br>📧 ${contact.email}` : ''}
+            ${contact.phone ? `<br>📞 ${contact.phone}` : ''}
+            <br><small style="color: #9ca3af;">Source: ${contact.source_url}</small>
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+      html += '<p style="margin-top: 10px;"><small><em>💡 Tip: You can manually add these contacts to your organizations using the data above.</em></small></p>';
+      resultsDiv.innerHTML = html;
+    } else {
+      resultsDiv.innerHTML = '<p style="color: #f59e0b;">⚠️ No contacts found on this website. Try a different URL or the company\'s "About" or "Team" page.</p>';
+    }
+    
+  } catch (error) {
+    resultsDiv.innerHTML = `<p style="color: #dc2626;">❌ Error: ${error.message}</p>`;
+  }
+}
+
 async function renderChartFor(orgId) {
   const projectId = document.getElementById('project-selector').value || '';
   const q = projectId ? `?project_id=${projectId}` : '';
@@ -119,6 +174,10 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('csv-form').addEventListener('submit', (e) => {
     e.preventDefault();
     uploadCSV(e.target);
+  });
+  document.getElementById('scraper-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    searchContacts(e.target);
   });
   document.getElementById('org-selector').addEventListener('change', (e) => {
     loadProjects(e.target.value).then(() => renderChartFor(e.target.value));
