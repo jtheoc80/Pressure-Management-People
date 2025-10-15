@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: industrial-orgcharts
+    env: python
+    plan: free
+    buildCommand: pip install -r orgchart_app/requirements.txt
+    startCommand: cd orgchart_app && python3 seed.py && gunicorn -w 2 -b 0.0.0.0:$PORT wsgi:app
+    autoDeploy: false

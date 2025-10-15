@@ -1,0 +1,8 @@
+organization,name,title,email,phone,location,department,manager_email,is_epc_contact
+Acme LNG,Linda Chen,VP Operations,linda.chen@acmelng.com,,Houston,Operations,,
+Acme LNG,Tom Rivera,Maintenance Director,tom.rivera@acmelng.com,,Houston,Maintenance,linda.chen@acmelng.com,
+Acme LNG,Aisha Khan,Maintenance Planner,aisha.khan@acmelng.com,,Houston,Maintenance,tom.rivera@acmelng.com,
+Acme LNG,Eric Boyd,Project Manager,eric.boyd@acmelng.com,,Houston,Projects,linda.chen@acmelng.com,yes
+PetroMax,Franco Rossi,Plant Manager,franco.rossi@petromax.com,,Milan,Operations,,
+PetroMax,Sara Pinto,Sr. Mech Engineer,sara.pinto@petromax.com,,Milan,Engineering,franco.rossi@petromax.com,
+PetroMax,Julia Park,EPC Interface Lead,julia.park@petromax.com,,Milan,Projects,franco.rossi@petromax.com,yes

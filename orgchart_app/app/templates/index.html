@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Industrial Org Charts</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Industrial Org Charts</h1>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Organizations</h2>
+        <div id="org-list"></div>
+        <form id="org-form">
+          <input name="name" placeholder="Organization name" required />
+          <input name="sector" placeholder="Sector (e.g., Oil & Gas)" />
+          <input name="subsector" placeholder="Subsector (e.g., LNG)" />
+          <input name="country" placeholder="Country" />
+          <button type="submit">Add</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Import People (CSV)</h2>
+        <form id="csv-form">
+          <input type="file" name="file" accept=".csv" />
+          <button type="submit">Upload</button>
+        </form>
+        <details>
+          <summary>CSV format</summary>
+          <pre>organization,name,title,email,phone,location,department,manager_email,is_epc_contact</pre>
+        </details>
+      </section>
+
+      <section class="panel">
+        <h2>Org Chart</h2>
+        <div class="controls">
+          <label>
+            Organization
+            <select id="org-selector"></select>
+          </label>
+          <label>
+            Project
+            <select id="project-selector"><option value="">All</option></select>
+          </label>
+        </div>
+        <div id="chart"></div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="/static/js/orgchart.js"></script>
+  </body>
+</html>
