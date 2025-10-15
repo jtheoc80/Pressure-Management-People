@@ -1,0 +1,317 @@
+.org-chart-builder-container {
+  min-height: calc(100vh - 120px);
+}
+
+.ocb-header {
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.ocb-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+
+.ocb-header p {
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.ocb-main-content {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 2rem;
+}
+
+.ocb-search-panel {
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+}
+
+.ocb-search-panel h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+  color: #111827;
+}
+
+.ocb-warning {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ocb-warning strong {
+  display: block;
+  color: #92400e;
+  margin-bottom: 0.25rem;
+}
+
+.ocb-warning p {
+  color: #78350f;
+  margin: 0;
+}
+
+.ocb-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.ocb-form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.ocb-form-group input,
+.ocb-form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.ocb-form-group input:focus,
+.ocb-form-group select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.ocb-btn {
+  width: 100%;
+  padding: 0.875rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.ocb-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ocb-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  margin-bottom: 0.75rem;
+}
+
+.ocb-btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.ocb-btn-secondary {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.ocb-btn-secondary:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.ocb-chart-container {
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  min-height: 600px;
+}
+
+.ocb-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.ocb-chart-header h2 {
+  font-size: 1.5rem;
+  color: #111827;
+}
+
+.ocb-export-btn {
+  padding: 0.625rem 1.25rem;
+  background: white;
+  border: 2px solid #667eea;
+  color: #667eea;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+}
+
+.ocb-export-btn:hover {
+  background: #667eea;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.ocb-results-info {
+  background: #eff6ff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid #667eea;
+}
+
+.ocb-results-info h3 {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+  color: #111827;
+}
+
+.ocb-results-info p {
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin: 0;
+}
+
+.ocb-chart-area {
+  width: 100%;
+  overflow-x: auto;
+  background: #fafafa;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  min-height: 400px;
+}
+
+.ocb-empty-state {
+  text-align: center;
+  padding: 5rem 1.25rem;
+  color: #9ca3af;
+}
+
+.ocb-empty-state h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.625rem;
+  color: #6b7280;
+}
+
+.ocb-empty-state p {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.ocb-loading {
+  text-align: center;
+  padding: 5rem 1.25rem;
+}
+
+.ocb-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: ocb-spin 1s linear infinite;
+  margin: 0 auto 1.25rem;
+}
+
+@keyframes ocb-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* D3 Chart Styles */
+.ocb-chart-area .node rect {
+  fill: white;
+  stroke: #667eea;
+  stroke-width: 2px;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: all 0.2s;
+}
+
+.ocb-chart-area .node:hover rect {
+  fill: #eff6ff;
+  stroke: #764ba2;
+  stroke-width: 3px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+}
+
+.ocb-chart-area .node text {
+  font-family: inherit;
+  pointer-events: none;
+}
+
+.ocb-chart-area .node .name {
+  font-size: 13px;
+  font-weight: 600;
+  fill: #111827;
+}
+
+.ocb-chart-area .node .title {
+  font-size: 11px;
+  fill: #6b7280;
+}
+
+.ocb-chart-area .link {
+  fill: none;
+  stroke: #cbd5e0;
+  stroke-width: 2px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .ocb-main-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .ocb-search-panel {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .ocb-header {
+    padding: 1.5rem;
+  }
+  
+  .ocb-header h1 {
+    font-size: 1.5rem;
+  }
+  
+  .ocb-chart-container {
+    padding: 1.5rem;
+  }
+  
+  .ocb-chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .ocb-export-btn {
+    width: 100%;
+  }
+  
+  .ocb-chart-area {
+    overflow-x: scroll;
+  }
+}
