@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, send_from_directory, jsonify
 from .config import Config
 from .database import db
 
@@ -52,6 +52,9 @@ def create_app() -> Flask:
     def serve_frontend(path: str):
         # If a React build exists, serve static assets or index.html as SPA fallback.
         if _has_frontend_build():
+            # Never intercept unknown API routes; return a JSON 404 so axios rejects
+            if path.startswith("api/"):
+                return jsonify({"error": "not_found"}), 404
             candidate = os.path.join(frontend_dir, path)
             if path and os.path.exists(candidate) and os.path.isfile(candidate):
                 return send_from_directory(frontend_dir, path)
