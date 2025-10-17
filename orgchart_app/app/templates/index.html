@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Industrial Org Charts</title>
-    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
   </head>
   <body>
     <header>
@@ -70,6 +70,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-    <script src="/static/js/orgchart.js"></script>
+    <script src="{{ url_for('static', filename='js/orgchart.js') }}"></script>
   </body>
 </html>

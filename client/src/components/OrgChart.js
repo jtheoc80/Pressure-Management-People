@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactFlow, {
   MiniMap,
@@ -12,6 +12,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import axios from 'axios';
 import './OrgChart.css';
+import { toPng } from 'html-to-image';
 
 const nodeTypes = {
   custom: CustomNode
@@ -66,6 +67,7 @@ function OrgChart() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
   const [layout, setLayout] = useState('vertical');
+  const chartWrapperRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -185,6 +187,21 @@ function OrgChart() {
     URL.revokeObjectURL(url);
   };
 
+  const exportChartPng = async () => {
+    try {
+      const target = chartWrapperRef.current;
+      if (!target) return;
+      const dataUrl = await toPng(target, { cacheBust: true, backgroundColor: 'white', pixelRatio: 2 });
+      const link = document.createElement('a');
+      link.download = `${organization?.name?.replace(/\s+/g, '_') || 'org_chart'}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (e) {
+      console.error('PNG export failed', e);
+      alert('Failed to export image');
+    }
+  };
+
   if (loading) {
     return <div className="loading">Loading org chart...</div>;
   }
@@ -225,6 +242,15 @@ function OrgChart() {
             </svg>
             Export
           </button>
+          <button className="btn btn-secondary" onClick={exportChartPng}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Export PNG
+          </button>
           <Link to={`/organizations/${id}`} className="btn btn-primary">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="15 18 9 12 15 6" />
@@ -251,7 +277,7 @@ function OrgChart() {
           </div>
         </div>
       ) : (
-        <div className="chart-container">
+        <div className="chart-container" ref={chartWrapperRef}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
