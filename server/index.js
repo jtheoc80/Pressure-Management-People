@@ -338,6 +338,14 @@ app.post('/api/contact-projects', (req, res) => {
   );
 });
 
+// ============= PRODUCTION STATIC FILE SERVING =============
+
+// In production, serve the built React app
+if (process.env.NODE_ENV === 'production') {
+  const buildPath = path.join(__dirname, '..', 'client', 'build');
+  app.use(express.static(buildPath));
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -541,6 +549,15 @@ app.post('/api/enrich/pdl/search', async (req, res) => {
     res.status(500).json({ error: 'server_error', detail: String(err?.message || err) });
   }
 });
+
+// ============= PRODUCTION CATCH-ALL ROUTE =============
+
+// In production, serve index.html for all non-API routes (enables client-side routing)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'client', 'build', 'index.html'));
+  });
+}
 
 // Start server
 app.listen(PORT, () => {

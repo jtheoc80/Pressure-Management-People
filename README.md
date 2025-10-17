@@ -71,6 +71,27 @@ A comprehensive web application for building and managing visual organization ch
    - Open your browser and navigate to: `http://localhost:3000`
    - Backend API is available at: `http://localhost:5000/api`
 
+## ⚙️ Production Deployment
+
+For production single-service deployment (e.g., Render, Heroku):
+
+1. **Build the application**
+   ```bash
+   npm run install-all && npm run build
+   ```
+
+2. **Set environment variable**
+   ```bash
+   export NODE_ENV=production
+   ```
+
+3. **Start the production server**
+   ```bash
+   npm run start:prod
+   ```
+
+The server will serve both the API routes and the built React frontend from the same origin.
+
 ## 📖 Usage Guide
 
 ### Creating Your First Organization
