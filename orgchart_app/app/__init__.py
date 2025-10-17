@@ -5,7 +5,13 @@ from .database import db
 
 
 def create_app() -> Flask:
-    app = Flask(__name__, static_folder="static", template_folder="templates")
+    # Move Flask's own static to a non-conflicting URL so CRA assets can use /static
+    app = Flask(
+        __name__,
+        static_folder="static",
+        static_url_path="/flask-static",
+        template_folder="templates",
+    )
     app.config.from_object(Config)
 
     db.init_app(app)

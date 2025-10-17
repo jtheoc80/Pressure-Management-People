@@ -4,7 +4,8 @@
 FROM node:20-slim AS client-build
 WORKDIR /client
 COPY client/package.json client/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# Prefer reproducible installs; fall back to install if lock is out-of-sync
+RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 COPY client/ ./
 RUN npm run build
 
@@ -15,7 +16,7 @@ FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=7860
+    PORT=10000
 
 WORKDIR /app
 
@@ -30,6 +31,7 @@ COPY --from=client-build /client/build /app/frontend
 
 # Optional: seed at runtime is handled by start command in Render; keep image lean
 
-EXPOSE 7860
+EXPOSE 10000
 
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:7860", "wsgi:app"]
+# Bind to Render's provided PORT when available, defaulting to 10000
+CMD ["/bin/sh", "-lc", "gunicorn -w 2 -b 0.0.0.0:${PORT:-10000} wsgi:app"]
