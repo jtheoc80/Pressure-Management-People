@@ -208,6 +208,10 @@ See `server/api-integrations.js` for implementation examples.
 - `npm run client` - Start frontend only
 - `npm run build` - Build production frontend
 
+## 🚀 Deployment
+
+For single-service production deploys, run `npm run install-all && npm run build` and then start with `npm run start:prod` (set NODE_ENV=production).
+
 ## 🤝 Contributing
 
 This is a specialized application for industrial sector relationship management. Contributions focused on:

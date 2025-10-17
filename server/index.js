@@ -542,6 +542,18 @@ app.post('/api/enrich/pdl/search', async (req, res) => {
   }
 });
 
+// Serve static client in production
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '..', 'client', 'build');
+  app.use(express.static(clientBuildPath));
+
+  // Return index.html for requests that are not for /api/*
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
