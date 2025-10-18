@@ -4,3 +4,6 @@ services:
     env: docker
     plan: free
     autoDeploy: false
+    envVars:
+      - key: PDL_API_KEY
+        sync: false
