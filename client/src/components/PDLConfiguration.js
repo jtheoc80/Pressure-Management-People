@@ -32,10 +32,11 @@ function PDLConfiguration() {
     setTesting(true);
     setMessage({ type: '', text: '' });
     try {
-      const res = await axios.post('/api/enrich/pdl/search', {
-        company: 'test',
-        title: 'engineer',
-        limit: 1
+      // Test with the Person Identify endpoint (simpler and more reliable)
+      const res = await axios.post('/api/enrich/pdl/identify', {
+        first_name: 'ben',
+        last_name: 'eisenberg',
+        region: 'new york'
       });
       setTestResults({
         success: true,
@@ -181,6 +182,44 @@ function PDLConfiguration() {
               <p><strong>Paid Plans:</strong> Starting at $0.10 per request</p>
               <p><strong>Rate Limits:</strong> 10 requests per second</p>
             </div>
+
+            <h3>Usage Examples</h3>
+            <div className="code-examples">
+              <h4>Person Identify (Recommended for simple lookups)</h4>
+              <div className="code-block">
+                <code>
+                  {`// POST /api/enrich/pdl/identify
+{
+  "first_name": "ben",
+  "last_name": "eisenberg", 
+  "region": "new york"
+}`}
+                </code>
+              </div>
+              
+              <h4>Person Search (Advanced filtering)</h4>
+              <div className="code-block">
+                <code>
+                  {`// POST /api/enrich/pdl/search
+{
+  "company": "Google",
+  "title": "engineer",
+  "location": "San Francisco",
+  "limit": 10
+}`}
+                </code>
+              </div>
+              
+              <h4>Person Enrichment (By email)</h4>
+              <div className="code-block">
+                <code>
+                  {`// POST /api/enrich/pdl/enrich
+{
+  "email": "john@example.com"
+}`}
+                </code>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -191,15 +230,21 @@ function PDLConfiguration() {
           
           <div className="endpoints-list">
             <div className="endpoint-item">
+              <div className="endpoint-name">Person Identify</div>
+              <div className="endpoint-description">Identify people by first name, last name, and region (simplest method)</div>
+              <div className="endpoint-path"><code>POST /api/enrich/pdl/identify</code></div>
+            </div>
+            
+            <div className="endpoint-item">
               <div className="endpoint-name">Person Search</div>
               <div className="endpoint-description">Search for contacts by company, title, location, and other criteria</div>
               <div className="endpoint-path"><code>POST /api/enrich/pdl/search</code></div>
             </div>
             
             <div className="endpoint-item">
-              <div className="endpoint-name">Company Enrichment</div>
-              <div className="endpoint-description">Enrich company data using domain or company name</div>
-              <div className="endpoint-path"><code>POST /api/enrich/pdl/company</code></div>
+              <div className="endpoint-name">Person Enrichment</div>
+              <div className="endpoint-description">Enrich person data using email, name, or LinkedIn URL</div>
+              <div className="endpoint-path"><code>POST /api/enrich/pdl/enrich</code></div>
             </div>
           </div>
         </div>
@@ -211,7 +256,16 @@ function PDLConfiguration() {
           
           <div className="parameters-list">
             <div className="parameter-group">
-              <h4>Basic Filters</h4>
+              <h4>Person Identify (Simplest)</h4>
+              <ul>
+                <li><code>first_name</code> - Person's first name (required)</li>
+                <li><code>last_name</code> - Person's last name (required)</li>
+                <li><code>region</code> - Geographic region (optional)</li>
+              </ul>
+            </div>
+            
+            <div className="parameter-group">
+              <h4>Person Search Filters</h4>
               <ul>
                 <li><code>company</code> - Company name</li>
                 <li><code>company_domain</code> - Company website domain</li>
@@ -222,13 +276,23 @@ function PDLConfiguration() {
             </div>
             
             <div className="parameter-group">
-              <h4>Advanced Filters</h4>
+              <h4>Advanced Search Filters</h4>
               <ul>
                 <li><code>industry</code> - Industry sector</li>
                 <li><code>skills</code> - Comma-separated skills</li>
                 <li><code>education</code> - Education keywords</li>
                 <li><code>summary</code> - Profile summary keywords</li>
                 <li><code>experience_level</code> - Experience level (entry, mid, senior, executive)</li>
+              </ul>
+            </div>
+            
+            <div className="parameter-group">
+              <h4>Person Enrichment</h4>
+              <ul>
+                <li><code>email</code> - Email address</li>
+                <li><code>name</code> - Full name</li>
+                <li><code>company</code> - Company name</li>
+                <li><code>linkedin_url</code> - LinkedIn profile URL</li>
               </ul>
             </div>
             
