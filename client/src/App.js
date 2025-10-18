@@ -9,6 +9,7 @@ import AddContact from './components/AddContact';
 import Dashboard from './components/Dashboard';
 import SalesAssist from './components/SalesAssist';
 import OrgChartBuilder from './components/OrgChartBuilder';
+import PDLConfiguration from './components/PDLConfiguration';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/organizations/:id/contacts/new" element={<AddContact />} />
             <Route path="/sales-assist" element={<SalesAssist />} />
             <Route path="/chart-builder" element={<OrgChartBuilder />} />
+            <Route path="/pdl-config" element={<PDLConfiguration />} />
           </Routes>
         </main>
       </div>
@@ -50,6 +52,7 @@ function Header() {
           <Link to="/organizations" className="nav-link">Organizations</Link>
           <Link to="/sales-assist" className="nav-link">Sales Assist</Link>
           <Link to="/chart-builder" className="nav-link">Chart Builder</Link>
+          <Link to="/pdl-config" className="nav-link">PDL Config</Link>
         </nav>
       </div>
     </header>

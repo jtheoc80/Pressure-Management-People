@@ -57,7 +57,7 @@ function getPdlApiKeySource() {
   }
   return undefined;
 }
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors());
@@ -141,6 +141,18 @@ function initializeDatabase() {
     due_date TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE SET NULL
+  )`);
+
+  // PDL API usage tracking
+  db.run(`CREATE TABLE IF NOT EXISTS pdl_usage (
+    id TEXT PRIMARY KEY,
+    endpoint TEXT NOT NULL,
+    query_params TEXT,
+    results_count INTEGER DEFAULT 0,
+    response_time_ms INTEGER,
+    success BOOLEAN DEFAULT 1,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 }
 
@@ -413,6 +425,54 @@ app.get('/api/enrich/providers', (req, res) => {
   });
 });
 
+// Get PDL usage analytics
+app.get('/api/enrich/pdl/usage', (req, res) => {
+  const { days = 30 } = req.query;
+  
+  db.all(`
+    SELECT 
+      endpoint,
+      COUNT(*) as total_requests,
+      SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_requests,
+      SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_requests,
+      SUM(results_count) as total_results,
+      AVG(response_time_ms) as avg_response_time,
+      MAX(created_at) as last_request
+    FROM pdl_usage 
+    WHERE created_at >= datetime('now', '-${parseInt(days)} days')
+    GROUP BY endpoint
+    ORDER BY last_request DESC
+  `, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    // Get daily usage for the last 7 days
+    db.all(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as requests,
+        SUM(results_count) as results
+      FROM pdl_usage 
+      WHERE created_at >= datetime('now', '-7 days')
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC
+    `, [], (err2, dailyRows) => {
+      if (err2) {
+        res.status(500).json({ error: err2.message });
+        return;
+      }
+      
+      res.json({
+        summary: rows,
+        daily_usage: dailyRows,
+        period_days: parseInt(days)
+      });
+    });
+  });
+});
+
 // Create a sales help request
 app.post('/api/sales-requests', (req, res) => {
   const { org_id, title, details, priority, due_date } = req.body;
@@ -523,14 +583,83 @@ app.get('/api/export/org/:id', (req, res) => {
   });
 });
 
-// Search People Data Labs for contacts (server-side proxy)
-app.post('/api/enrich/pdl/search', async (req, res) => {
+// Enrich company data using People Data Labs
+app.post('/api/enrich/pdl/company', async (req, res) => {
   try {
     const apiKey = getPdlApiKey();
     if (!apiKey) {
       res.status(400).json({ error: 'PDL_API_KEY not configured' });
       return;
     }
+
+    const { domain } = req.body;
+    if (!domain) {
+      res.status(400).json({ error: 'Domain is required' });
+      return;
+    }
+
+    const pdlResp = await fetch('https://api.peopledatalabs.com/v5/company/enrich', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        website: domain,
+        pretty: true
+      }),
+    });
+
+    if (!pdlResp.ok) {
+      const text = await pdlResp.text();
+      res.status(pdlResp.status).json({ error: 'pdl_error', detail: text });
+      return;
+    }
+
+    const data = await pdlResp.json();
+    const company = data;
+    
+    // Transform PDL company response to our format
+    const enrichedCompany = {
+      name: company.name || '',
+      industry: company.industry || '',
+      sector: company.sector || '',
+      website: company.website || domain,
+      location: company.location_name || company.location || '',
+      size: company.employee_count || company.size || '',
+      summary: company.summary || company.description || '',
+      founded_year: company.founded_year || '',
+      revenue: company.annual_revenue || '',
+      technologies: company.technologies || [],
+      social_media: company.social_media || {},
+      source: 'pdl'
+    };
+
+    res.json(enrichedCompany);
+  } catch (err) {
+    res.status(500).json({ error: 'server_error', detail: String(err?.message || err) });
+  }
+});
+
+// Search People Data Labs for contacts (server-side proxy)
+app.post('/api/enrich/pdl/search', async (req, res) => {
+  const startTime = Date.now();
+  let usageId = null;
+  
+  try {
+    const apiKey = getPdlApiKey();
+    if (!apiKey) {
+      res.status(400).json({ error: 'PDL_API_KEY not configured' });
+      return;
+    }
+
+    // Log usage start
+    usageId = uuidv4();
+    const queryParams = JSON.stringify(req.body);
+    db.run(
+      `INSERT INTO pdl_usage (id, endpoint, query_params) VALUES (?, ?, ?)`,
+      [usageId, 'person/search', queryParams]
+    );
 
     const {
       name,
@@ -541,6 +670,12 @@ app.post('/api/enrich/pdl/search', async (req, res) => {
       title,
       seniority,
       location,
+      industry,
+      job_title_levels,
+      experience_level,
+      skills,
+      education,
+      summary,
       limit = 10,
     } = req.body || {};
 
@@ -558,6 +693,27 @@ app.post('/api/enrich/pdl/search', async (req, res) => {
     if (name) conditions.push(`full_name:"${esc(name)}"`);
     if (first_name) conditions.push(`first_name:"${esc(first_name)}"`);
     if (last_name) conditions.push(`last_name:"${esc(last_name)}"`);
+    if (industry) conditions.push(`job_company_industry:"${esc(industry)}"`);
+    if (job_title_levels) conditions.push(`job_title_levels:"${esc(job_title_levels)}"`);
+    if (experience_level) conditions.push(`experience_level:"${esc(experience_level)}"`);
+    if (skills) {
+      const skillsArray = skills.split(',').map(s => s.trim()).filter(s => s);
+      skillsArray.forEach(skill => {
+        conditions.push(`skills:"${esc(skill)}"`);
+      });
+    }
+    if (education) {
+      const educationArray = education.split(',').map(e => e.trim()).filter(e => e);
+      educationArray.forEach(edu => {
+        conditions.push(`education:"${esc(edu)}"`);
+      });
+    }
+    if (summary) {
+      const summaryArray = summary.split(',').map(s => s.trim()).filter(s => s);
+      summaryArray.forEach(keyword => {
+        conditions.push(`summary:"${esc(keyword)}"`);
+      });
+    }
 
     const sql = conditions.length
       ? `SELECT * FROM person WHERE ${conditions.join(' AND ')}`
@@ -574,6 +730,11 @@ app.post('/api/enrich/pdl/search', async (req, res) => {
 
     if (!pdlResp.ok) {
       const text = await pdlResp.text();
+      const responseTime = Date.now() - startTime;
+      db.run(
+        `UPDATE pdl_usage SET response_time_ms = ?, success = 0, error_message = ? WHERE id = ?`,
+        [responseTime, text, usageId]
+      );
       res.status(pdlResp.status).json({ error: 'pdl_error', detail: text });
       return;
     }
@@ -596,8 +757,22 @@ app.post('/api/enrich/pdl/search', async (req, res) => {
       };
     });
 
+    // Update usage with success
+    const responseTime = Date.now() - startTime;
+    db.run(
+      `UPDATE pdl_usage SET results_count = ?, response_time_ms = ?, success = 1 WHERE id = ?`,
+      [results.length, responseTime, usageId]
+    );
+
     res.json({ total: data?.total || results.length, results });
   } catch (err) {
+    const responseTime = Date.now() - startTime;
+    if (usageId) {
+      db.run(
+        `UPDATE pdl_usage SET response_time_ms = ?, success = 0, error_message = ? WHERE id = ?`,
+        [responseTime, String(err?.message || err), usageId]
+      );
+    }
     res.status(500).json({ error: 'server_error', detail: String(err?.message || err) });
   }
 });
