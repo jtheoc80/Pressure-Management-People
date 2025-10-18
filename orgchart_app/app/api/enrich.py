@@ -14,6 +14,8 @@ def list_providers():
     return jsonify({
         "clearbit": bool(cfg.get("CLEARBIT_API_KEY")),
         "pdl": bool(cfg.get("PDL_API_KEY")),
+        # Non-secret hint to help diagnose which var name was used
+        "pdl_source": cfg.get("PDL_API_KEY_SOURCE"),
         "crunchbase": bool(cfg.get("CRUNCHBASE_API_KEY")),
     })
 

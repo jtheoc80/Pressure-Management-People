@@ -350,7 +350,10 @@ function SalesAssist() {
           </div>
           {!providers.pdl && (
             <div className="callout callout-warning" style={{ marginBottom: '1rem' }}>
-              <strong>Provider setup:</strong> Set environment variable <code>PDL_API_KEY</code> and restart the server. Example: <code>export PDL_API_KEY=your_key</code>
+              <strong>Provider setup:</strong> Set one of these env vars and restart the server: <code>PDL_API_KEY</code>, <code>PEOPLE_DATA_LABS_API_KEY</code>, <code>PEOPLEDATALABS_API_KEY</code>. Example: <code>export PDL_API_KEY=your_key</code>
+              {providers.pdl_source && (
+                <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>(detected: {providers.pdl_source})</span>
+              )}
             </div>
           )}
           {message.text && (
