@@ -9,6 +9,26 @@ const {
 } = require('./api-integrations');
 
 const app = express();
+
+// Helper: robustly read PDL API key from multiple env var names
+function getEnvFirst(names) {
+  for (const name of names) {
+    if (process.env[name]) return process.env[name];
+  }
+  return undefined;
+}
+
+function getPdlApiKey() {
+  return getEnvFirst([
+    'PDL_API_KEY',
+    'PEOPLE_DATA_LABS_API_KEY',
+    'PEOPLE_DATA_LAB_API_KEY',
+    'PEOPLEDATALABS_API_KEY',
+    'PEOPLE_DATALABS_API_KEY',
+    'PDL_KEY',
+    'PDLAPIKEY',
+  ]);
+}
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -359,7 +379,7 @@ app.get('/api/enrich/providers', (req, res) => {
     clearbit: Boolean(process.env.CLEARBIT_API_KEY),
     zoominfo: Boolean(process.env.ZOOMINFO_API_KEY),
     apollo: Boolean(process.env.APOLLO_API_KEY),
-    pdl: Boolean(process.env.PDL_API_KEY),
+    pdl: Boolean(getPdlApiKey()),
   });
 });
 
@@ -476,7 +496,7 @@ app.get('/api/export/org/:id', (req, res) => {
 // Search People Data Labs for contacts (server-side proxy)
 app.post('/api/enrich/pdl/search', async (req, res) => {
   try {
-    const apiKey = process.env.PDL_API_KEY;
+    const apiKey = getPdlApiKey();
     if (!apiKey) {
       res.status(400).json({ error: 'PDL_API_KEY not configured' });
       return;
@@ -515,7 +535,7 @@ app.post('/api/enrich/pdl/search', async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': apiKey,
+        'X-Api-Key': apiKey,
       },
       body: JSON.stringify({ query, size: Math.max(1, Math.min(25, Number(limit) || 10)) }),
     });
