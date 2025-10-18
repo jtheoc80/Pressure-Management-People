@@ -62,6 +62,9 @@ def pdl_search():
     title = data.get("title", "")
     seniority = data.get("seniority", "")
     location = data.get("location", "")
+    name = data.get("name", "")
+    first_name = data.get("first_name", "")
+    last_name = data.get("last_name", "")
     limit = data.get("limit", 50)
     
     # Build PDL SQL query
@@ -80,6 +83,13 @@ def pdl_search():
     
     if location:
         conditions.append(f'location_name:"{location}"')
+
+    if name:
+        conditions.append(f'full_name:"{name}"')
+    if first_name:
+        conditions.append(f'first_name:"{first_name}"')
+    if last_name:
+        conditions.append(f'last_name:"{last_name}"')
     
     if not conditions:
         return jsonify({
