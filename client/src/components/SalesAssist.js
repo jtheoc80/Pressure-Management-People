@@ -23,6 +23,12 @@ function SalesAssist() {
     seniority: '',
     location: '',
     limit: 10,
+    industry: '',
+    job_title_levels: '',
+    experience_level: '',
+    skills: '',
+    education: '',
+    summary: ''
   });
 
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -40,6 +46,14 @@ function SalesAssist() {
   const [csvText, setCsvText] = useState('');
   const [csvPreview, setCsvPreview] = useState([]);
   const [parsingCsv, setParsingCsv] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, status: '' });
+  const [importResults, setImportResults] = useState({ success: 0, failed: 0, errors: [] });
+  const [companyEnrichment, setCompanyEnrichment] = useState({
+    domain: '',
+    loading: false,
+    results: null,
+    error: null
+  });
 
   useEffect(() => {
     try {
@@ -96,37 +110,126 @@ function SalesAssist() {
     }
   };
 
+  const validatePDLQuery = (query) => {
+    const errors = [];
+    
+    if (!query.company_domain && !query.company) {
+      errors.push('Company domain or company name is required');
+    }
+    
+    if (!query.title) {
+      errors.push('Title is required');
+    }
+    
+    if (query.company_domain && !isValidDomain(query.company_domain)) {
+      errors.push('Invalid domain format (e.g., acme.com)');
+    }
+    
+    if (query.limit && (query.limit < 1 || query.limit > 25)) {
+      errors.push('Limit must be between 1 and 25');
+    }
+    
+    if (query.email && !isValidEmail(query.email)) {
+      errors.push('Invalid email format');
+    }
+    
+    return errors;
+  };
+
+  const isValidDomain = (domain) => {
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}$/;
+    return domainRegex.test(domain);
+  };
+
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const searchPDL = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
     setSelectedIndexes(new Set());
-    if (!pdlQuery.company_domain && !pdlQuery.company) {
-      setMessage({ type: 'warning', text: 'Enter a company domain or company name.' });
+    
+    // Validate query
+    const validationErrors = validatePDLQuery(pdlQuery);
+    if (validationErrors.length > 0) {
+      setMessage({ type: 'warning', text: validationErrors.join('. ') });
       return;
     }
-    if (!pdlQuery.title) {
-      setMessage({ type: 'warning', text: 'Enter a target title or use a preset.' });
-      return;
-    }
+    
     setPdlLoading(true);
     try {
       const res = await axios.post('/api/enrich/pdl/search', pdlQuery);
       const results = res.data.results || [];
       setPdlResults(results);
+      
       if (results.length === 0) {
-        setMessage({ type: 'info', text: 'No results. Try broadening the title or removing location.' });
+        setMessage({ 
+          type: 'info', 
+          text: 'No results found. Try broadening your search criteria or removing location filters.' 
+        });
       } else {
-        setMessage({ type: 'success', text: `Found ${results.length} contact(s).` });
+        setMessage({ 
+          type: 'success', 
+          text: `Found ${results.length} contact(s). ${res.data.total ? `(${res.data.total} total available)` : ''}` 
+        });
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'PDL search failed. Check your filters or provider configuration.' });
+      let errorMessage = 'PDL search failed. ';
+      
+      if (err.response?.status === 400) {
+        errorMessage += 'Invalid search parameters. Check your filters.';
+      } else if (err.response?.status === 401) {
+        errorMessage += 'PDL API key is invalid or expired.';
+      } else if (err.response?.status === 429) {
+        errorMessage += 'Rate limit exceeded. Please wait before trying again.';
+      } else if (err.response?.status === 500) {
+        errorMessage += 'PDL API server error. Please try again later.';
+      } else if (err.response?.data?.error === 'pdl_error') {
+        errorMessage += `PDL API error: ${err.response.data.detail || 'Unknown error'}`;
+      } else {
+        errorMessage += 'Check your network connection and try again.';
+      }
+      
+      setMessage({ type: 'error', text: errorMessage });
     } finally {
       setPdlLoading(false);
     }
   };
 
+  const validateContactData = (person) => {
+    const errors = [];
+    
+    if (!person.first_name && !person.full_name) {
+      errors.push('Name is required');
+    }
+    
+    if (person.email && !isValidEmail(person.email)) {
+      errors.push('Invalid email format');
+    }
+    
+    if (person.phone && !isValidPhone(person.phone)) {
+      errors.push('Invalid phone format');
+    }
+    
+    return errors;
+  };
+
+  const isValidPhone = (phone) => {
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
+  };
+
   const savePDLContact = async (person) => {
     try {
+      // Validate contact data
+      const validationErrors = validateContactData(person);
+      if (validationErrors.length > 0) {
+        setMessage({ type: 'warning', text: `Cannot save contact: ${validationErrors.join(', ')}` });
+        return;
+      }
+
       let orgId = form.org_id;
       if (!orgId) {
         const match = organizations.find((o) => o.name?.toLowerCase() === (person.company || '').toLowerCase());
@@ -140,12 +243,14 @@ function SalesAssist() {
           location: person.location || ''
         });
         orgId = orgRes.data.id;
+        setOrganizations(prev => [...prev, orgRes.data]);
       }
       if (!orgId) {
         setMessage({ type: 'warning', text: 'Select an organization to save this contact.' });
         return;
       }
-      await axios.post('/api/contacts', {
+
+      const contactData = {
         org_id: orgId,
         first_name: person.first_name || person.full_name?.split(' ')[0] || '',
         last_name: person.last_name || person.full_name?.split(' ').slice(1).join(' ') || '',
@@ -158,11 +263,21 @@ function SalesAssist() {
         level: 0,
         responsibilities: '',
         project_types: '',
-        notes: 'Imported from PDL'
-      });
-      setMessage({ type: 'success', text: 'Contact saved.' });
+        notes: `Imported from PDL - ${new Date().toLocaleDateString()}`
+      };
+
+      await axios.post('/api/contacts', contactData);
+      setMessage({ type: 'success', text: `Contact ${contactData.first_name} ${contactData.last_name} saved successfully.` });
     } catch (e) {
-      setMessage({ type: 'error', text: 'Failed to save contact.' });
+      let errorMessage = 'Failed to save contact. ';
+      if (e.response?.status === 400) {
+        errorMessage += e.response.data.error || 'Invalid contact data.';
+      } else if (e.response?.status === 500) {
+        errorMessage += 'Server error. Please try again.';
+      } else {
+        errorMessage += 'Please check your connection and try again.';
+      }
+      setMessage({ type: 'error', text: errorMessage });
     }
   };
 
@@ -194,11 +309,16 @@ function SalesAssist() {
 
   const rolePresets = useMemo(
     () => [
-      { label: 'Maintenance Manager', title: 'maintenance manager', seniority: 'manager' },
-      { label: 'Reliability Engineer', title: 'reliability engineer', seniority: '' },
-      { label: 'Procurement', title: 'procurement', seniority: '' },
-      { label: 'Operations Manager', title: 'operations manager', seniority: 'manager' },
-      { label: 'Plant Manager', title: 'plant manager', seniority: 'manager' },
+      { label: 'Maintenance Manager', title: 'maintenance manager', seniority: 'manager', industry: 'oil & gas' },
+      { label: 'Reliability Engineer', title: 'reliability engineer', seniority: '', industry: 'oil & gas' },
+      { label: 'Procurement Manager', title: 'procurement manager', seniority: 'manager', industry: 'oil & gas' },
+      { label: 'Operations Manager', title: 'operations manager', seniority: 'manager', industry: 'oil & gas' },
+      { label: 'Plant Manager', title: 'plant manager', seniority: 'manager', industry: 'oil & gas' },
+      { label: 'Safety Manager', title: 'safety manager', seniority: 'manager', industry: 'oil & gas' },
+      { label: 'Project Manager', title: 'project manager', seniority: 'manager', industry: 'oil & gas' },
+      { label: 'Process Engineer', title: 'process engineer', seniority: '', industry: 'petrochemical' },
+      { label: 'LNG Operations', title: 'lng operations', seniority: '', industry: 'lng' },
+      { label: 'EPC Director', title: 'epc director', seniority: 'director', industry: 'epc' },
     ],
     []
   );
@@ -208,6 +328,7 @@ function SalesAssist() {
       ...prev,
       title: preset.title,
       seniority: preset.seniority || prev.seniority || '',
+      industry: preset.industry || prev.industry || '',
     }));
   };
 
@@ -257,56 +378,138 @@ function SalesAssist() {
 
   const importCsvRows = async () => {
     if (!csvPreview.length) {
-      alert('Nothing to import');
+      setMessage({ type: 'warning', text: 'Nothing to import' });
       return;
     }
+    
+    setImportProgress({ current: 0, total: csvPreview.length, status: 'Starting import...' });
+    setImportResults({ success: 0, failed: 0, errors: [] });
+    
+    const results = { success: 0, failed: 0, errors: [] };
+    
     try {
-      // Transform preview rows into contact create calls
-      const created = [];
-      for (const row of csvPreview) {
-        // Find or create organization
-        let orgId = form.org_id;
-        if (!orgId) {
-          const match = organizations.find((o) => o.name?.toLowerCase() === (row.company || row.organization || '').toLowerCase());
-          orgId = match?.id || null;
-        }
-        if (!orgId) {
-          // create org on the fly if company field exists
-          const companyName = row.company || row.organization;
-          if (companyName) {
-            const orgRes = await axios.post('/api/organizations', {
-              name: companyName,
-              industry: row.industry || 'Oil & Gas',
-              sector: row.sector || '',
-              location: row.location || ''
-            });
-            orgId = orgRes.data.id;
-          }
-        }
-        if (!orgId) continue;
-
-        await axios.post('/api/contacts', {
-          org_id: orgId,
-          first_name: row.first_name || '',
-          last_name: row.last_name || '',
-          title: row.title || '',
-          department: row.department || '',
-          email: row.email || '',
-          phone: row.phone || '',
-          location: row.location || '',
-          parent_id: null,
-          level: Number(row.level || 0),
-          responsibilities: row.responsibilities || '',
-          project_types: row.project_types || '',
-          notes: row.notes || ''
+      for (let i = 0; i < csvPreview.length; i++) {
+        const row = csvPreview[i];
+        setImportProgress({ 
+          current: i + 1, 
+          total: csvPreview.length, 
+          status: `Importing ${row.first_name} ${row.last_name}...` 
         });
-        created.push(row.email || `${row.first_name} ${row.last_name}`);
+        
+        try {
+          // Find or create organization
+          let orgId = form.org_id;
+          if (!orgId) {
+            const match = organizations.find((o) => o.name?.toLowerCase() === (row.company || row.organization || '').toLowerCase());
+            orgId = match?.id || null;
+          }
+          if (!orgId) {
+            // create org on the fly if company field exists
+            const companyName = row.company || row.organization;
+            if (companyName) {
+              const orgRes = await axios.post('/api/organizations', {
+                name: companyName,
+                industry: row.industry || 'Oil & Gas',
+                sector: row.sector || '',
+                location: row.location || ''
+              });
+              orgId = orgRes.data.id;
+              // Update organizations list
+              setOrganizations(prev => [...prev, orgRes.data]);
+            }
+          }
+          if (!orgId) {
+            results.failed++;
+            results.errors.push(`Row ${i + 1}: No organization found for ${row.company || 'unknown company'}`);
+            continue;
+          }
+
+          await axios.post('/api/contacts', {
+            org_id: orgId,
+            first_name: row.first_name || '',
+            last_name: row.last_name || '',
+            title: row.title || '',
+            department: row.department || '',
+            email: row.email || '',
+            phone: row.phone || '',
+            location: row.location || '',
+            parent_id: null,
+            level: Number(row.level || 0),
+            responsibilities: row.responsibilities || '',
+            project_types: row.project_types || '',
+            notes: row.notes || ''
+          });
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push(`Row ${i + 1}: ${error.response?.data?.error || error.message}`);
+        }
+        
+        // Small delay to prevent overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-      alert(`Imported ${created.length} contacts`);
+      
+      setImportResults(results);
+      setImportProgress({ current: csvPreview.length, total: csvPreview.length, status: 'Import completed' });
+      
+      if (results.success > 0) {
+        setMessage({ 
+          type: 'success', 
+          text: `Successfully imported ${results.success} contacts${results.failed > 0 ? `, ${results.failed} failed` : ''}` 
+        });
+      } else {
+        setMessage({ type: 'error', text: 'No contacts were imported successfully' });
+      }
+      
       setCsvText('');
       setCsvPreview([]);
     } catch (e) {
-      alert('Import failed');
+      setMessage({ type: 'error', text: 'Import process failed' });
+      setImportProgress({ current: 0, total: 0, status: 'Import failed' });
+    }
+  };
+
+  const enrichCompany = async (e) => {
+    e.preventDefault();
+    if (!companyEnrichment.domain) {
+      setCompanyEnrichment(prev => ({ ...prev, error: 'Please enter a company domain' }));
+      return;
+    }
+    
+    setCompanyEnrichment(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const res = await axios.post('/api/enrich/pdl/company', {
+        domain: companyEnrichment.domain
+      });
+      setCompanyEnrichment(prev => ({ 
+        ...prev, 
+        loading: false, 
+        results: res.data,
+        error: null 
+      }));
+    } catch (error) {
+      setCompanyEnrichment(prev => ({ 
+        ...prev, 
+        loading: false, 
+        error: error.response?.data?.error || 'Company enrichment failed' 
+      }));
+    }
+  };
+
+  const createOrgFromEnrichment = async (companyData) => {
+    try {
+      const res = await axios.post('/api/organizations', {
+        name: companyData.name,
+        industry: companyData.industry || 'Oil & Gas',
+        sector: companyData.sector || '',
+        location: companyData.location || '',
+        notes: `Enriched from PDL - ${companyData.website || companyEnrichment.domain}`
+      });
+      setOrganizations(prev => [...prev, res.data]);
+      setForm(prev => ({ ...prev, org_id: res.data.id }));
+      setMessage({ type: 'success', text: 'Organization created from enrichment data' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to create organization' });
     }
   };
 
@@ -401,12 +604,47 @@ function SalesAssist() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Location</label>
-                <input className="form-input" value={pdlQuery.location} onChange={(e) => setPdlQuery({ ...pdlQuery, location: e.target.value })} />
+                <label className="form-label">Industry</label>
+                <select className="form-select" value={pdlQuery.industry} onChange={(e) => setPdlQuery({ ...pdlQuery, industry: e.target.value })}>
+                  <option value="">Any</option>
+                  <option value="oil & gas">Oil & Gas</option>
+                  <option value="petrochemical">Petrochemical</option>
+                  <option value="lng">LNG</option>
+                  <option value="epc">EPC</option>
+                  <option value="energy">Energy</option>
+                  <option value="manufacturing">Manufacturing</option>
+                </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Limit</label>
-                <input type="number" className="form-input" value={pdlQuery.limit} onChange={(e) => setPdlQuery({ ...pdlQuery, limit: Number(e.target.value) })} />
+                <label className="form-label">Location</label>
+                <input className="form-input" placeholder="Houston, TX" value={pdlQuery.location} onChange={(e) => setPdlQuery({ ...pdlQuery, location: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Experience Level</label>
+                <select className="form-select" value={pdlQuery.experience_level} onChange={(e) => setPdlQuery({ ...pdlQuery, experience_level: e.target.value })}>
+                  <option value="">Any</option>
+                  <option value="entry">Entry Level</option>
+                  <option value="mid">Mid Level</option>
+                  <option value="senior">Senior Level</option>
+                  <option value="executive">Executive</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Skills (comma-separated)</label>
+                <input className="form-input" placeholder="maintenance, reliability, safety" value={pdlQuery.skills} onChange={(e) => setPdlQuery({ ...pdlQuery, skills: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Education</label>
+                <input className="form-input" placeholder="engineering, business" value={pdlQuery.education} onChange={(e) => setPdlQuery({ ...pdlQuery, education: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Summary keywords</label>
+                <input className="form-input" placeholder="turnaround, project management" value={pdlQuery.summary} onChange={(e) => setPdlQuery({ ...pdlQuery, summary: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Results limit</label>
+                <input type="number" className="form-input" min="1" max="25" value={pdlQuery.limit} onChange={(e) => setPdlQuery({ ...pdlQuery, limit: Number(e.target.value) })} />
+                <div className="form-hint">Max 25 results per search</div>
               </div>
             </div>
             <div className="form-group">
@@ -495,6 +733,163 @@ function SalesAssist() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: '1.5rem' }}>
+        <div className="card-header">
+          <h2 className="card-title">Company Enrichment (PDL)</h2>
+          {!providers.pdl && (
+            <span className="badge badge-yellow">PDL key not configured</span>
+          )}
+        </div>
+        {!providers.pdl && (
+          <div className="callout callout-warning" style={{ marginBottom: '1rem' }}>
+            <strong>Provider setup:</strong> Set one of these env vars and restart the server: <code>PDL_API_KEY</code>, <code>PEOPLE_DATA_LABS_API_KEY</code>, <code>PEOPLEDATALABS_API_KEY</code>. Example: <code>export PDL_API_KEY=your_key</code>
+          </div>
+        )}
+        <form onSubmit={enrichCompany} className="grid-form">
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Company Domain</label>
+              <input 
+                className="form-input" 
+                placeholder="acme.com" 
+                value={companyEnrichment.domain} 
+                onChange={(e) => setCompanyEnrichment(prev => ({ ...prev, domain: e.target.value }))} 
+              />
+              <div className="form-hint">Enter the company's website domain for enrichment</div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Action</label>
+              <button type="submit" className="btn btn-primary" disabled={companyEnrichment.loading || !providers.pdl}>
+                {companyEnrichment.loading ? 'Enriching...' : 'Enrich Company'}
+              </button>
+            </div>
+          </div>
+        </form>
+        
+        {companyEnrichment.error && (
+          <div className="callout callout-error" style={{ marginTop: '1rem' }}>
+            {companyEnrichment.error}
+          </div>
+        )}
+        
+        {companyEnrichment.results && (
+          <div style={{ marginTop: '1rem' }}>
+            <h3>Enrichment Results</h3>
+            <div className="company-enrichment-results">
+              <div className="company-info">
+                <h4>{companyEnrichment.results.name}</h4>
+                <p><strong>Industry:</strong> {companyEnrichment.results.industry || 'N/A'}</p>
+                <p><strong>Website:</strong> {companyEnrichment.results.website || 'N/A'}</p>
+                <p><strong>Location:</strong> {companyEnrichment.results.location || 'N/A'}</p>
+                <p><strong>Size:</strong> {companyEnrichment.results.size || 'N/A'}</p>
+                <p><strong>Description:</strong> {companyEnrichment.results.summary || 'N/A'}</p>
+              </div>
+              <div className="form-actions">
+                <button 
+                  className="btn btn-success" 
+                  onClick={() => createOrgFromEnrichment(companyEnrichment.results)}
+                >
+                  Create Organization
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setCompanyEnrichment(prev => ({ ...prev, results: null }))}
+                >
+                  Clear Results
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: '1.5rem' }}>
+        <div className="card-header">
+          <h2 className="card-title">CSV Import</h2>
+        </div>
+        <div className="form-group">
+          <label className="form-label">CSV Data</label>
+          <textarea 
+            className="form-input" 
+            rows="6" 
+            placeholder="first_name,last_name,title,company,email,phone,location&#10;John,Doe,Manager,Acme Corp,john@acme.com,555-1234,Houston TX"
+            value={csvText} 
+            onChange={(e) => setCsvText(e.target.value)} 
+          />
+          <div className="form-hint">
+            Paste CSV data with headers: first_name, last_name, title, company, email, phone, location
+          </div>
+        </div>
+        
+        <div className="form-actions">
+          <button className="btn btn-primary" onClick={parseCsv} disabled={parsingCsv || !csvText.trim()}>
+            {parsingCsv ? 'Parsing...' : 'Parse CSV'}
+          </button>
+          {csvPreview.length > 0 && (
+            <button className="btn btn-success" onClick={importCsvRows} disabled={importProgress.total > 0}>
+              Import {csvPreview.length} contacts
+            </button>
+          )}
+        </div>
+        
+        {csvPreview.length > 0 && (
+          <div className="csv-preview" style={{ marginTop: '1rem' }}>
+            <h4>Preview ({csvPreview.length} rows):</h4>
+            <div className="table-responsive">
+              <table className="table">
+                <thead>
+                  <tr>
+                    {Object.keys(csvPreview[0] || {}).map(key => (
+                      <th key={key}>{key}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvPreview.map((row, idx) => (
+                    <tr key={idx}>
+                      {Object.values(row).map((value, colIdx) => (
+                        <td key={colIdx}>{value || '-'}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        
+        {importProgress.total > 0 && (
+          <div className="import-progress" style={{ marginTop: '1rem' }}>
+            <div className="progress-header">
+              <span className="progress-status">{importProgress.status}</span>
+              <span className="progress-count">{importProgress.current} / {importProgress.total}</span>
+            </div>
+            <div className="progress-bar">
+              <div 
+                className="progress-fill" 
+                style={{ 
+                  width: `${(importProgress.current / importProgress.total) * 100}%` 
+                }}
+              ></div>
+            </div>
+          </div>
+        )}
+        
+        {importResults.errors.length > 0 && (
+          <div className="import-errors" style={{ marginTop: '1rem' }}>
+            <h4>Import Errors ({importResults.errors.length}):</h4>
+            <div className="error-list">
+              {importResults.errors.slice(0, 10).map((error, idx) => (
+                <div key={idx} className="error-item">{error}</div>
+              ))}
+              {importResults.errors.length > 10 && (
+                <div className="error-item">... and {importResults.errors.length - 10} more errors</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: '1.5rem' }}>
