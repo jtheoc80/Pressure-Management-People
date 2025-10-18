@@ -67,53 +67,47 @@ def pdl_search():
     last_name = data.get("last_name", "")
     limit = data.get("limit", 50)
     
-    # Build PDL SQL query
-    conditions = []
+    # Build PDL search parameters (not SQL)
+    search_params = {}
     
     if company_domain:
-        conditions.append(f'job_company_website:"{company_domain}"')
+        search_params["company_domain"] = company_domain
     elif company:
-        conditions.append(f'job_company_name:"{company}"')
+        search_params["company_name"] = company
     
     if title:
-        conditions.append(f'job_title:"{title}"')
+        search_params["job_title"] = title
     
     if seniority:
-        conditions.append(f'job_title_levels:"{seniority}"')
+        search_params["job_title_levels"] = seniority
     
     if location:
-        conditions.append(f'location_name:"{location}"')
+        search_params["location_name"] = location
 
     if name:
-        conditions.append(f'full_name:"{name}"')
+        search_params["full_name"] = name
     if first_name:
-        conditions.append(f'first_name:"{first_name}"')
+        search_params["first_name"] = first_name
     if last_name:
-        conditions.append(f'last_name:"{last_name}"')
+        search_params["last_name"] = last_name
     
-    if not conditions:
+    if not search_params:
         return jsonify({
             "error": "At least one search parameter required",
             "results": []
         }), 400
     
-    sql_query = f"SELECT * FROM person WHERE {' AND '.join(conditions)}"
+    # Add API key and other required parameters
+    search_params["api_key"] = pdl_api_key
+    search_params["size"] = limit
     
-    # Call PDL API
+    # Call PDL Person Search API
     pdl_url = "https://api.peopledatalabs.com/v5/person/search"
     
     try:
-        response = requests.post(
+        response = requests.get(
             pdl_url,
-            json={
-                "sql": sql_query,
-                "size": limit,
-                "pretty": True
-            },
-            headers={
-                "X-Api-Key": pdl_api_key,
-                "Content-Type": "application/json"
-            },
+            params=search_params,
             timeout=30
         )
         
@@ -166,6 +160,94 @@ def pdl_search():
         return jsonify({
             "error": f"Unexpected error: {str(e)}",
             "results": []
+        }), 500
+
+
+@bp.post("/pdl/identify")
+def pdl_identify():
+    """
+    People Data Lab Person Identify API Integration
+    
+    Expected request body:
+    {
+        "first_name": "ben",
+        "last_name": "eisenberg",
+        "region": "new york"
+    }
+    """
+    cfg = current_app.config
+    pdl_api_key = cfg.get("PDL_API_KEY")
+    
+    if not pdl_api_key:
+        return jsonify({
+            "error": "PDL_API_KEY not configured"
+        }), 400
+    
+    data = request.get_json(force=True)
+    first_name = data.get("first_name", "")
+    last_name = data.get("last_name", "")
+    region = data.get("region", "")
+    
+    if not first_name or not last_name:
+        return jsonify({
+            "error": "first_name and last_name are required"
+        }), 400
+    
+    # Build PDL Identify API parameters
+    params = {
+        "api_key": pdl_api_key,
+        "first_name": first_name,
+        "last_name": last_name
+    }
+    
+    if region:
+        params["region"] = region
+    
+    # Call PDL Person Identify API
+    pdl_url = "https://api.peopledatalabs.com/v5/person/identify"
+    
+    try:
+        response = requests.get(
+            pdl_url,
+            params=params,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            return jsonify({
+                "error": f"PDL API error: {response.status_code}",
+                "details": response.text
+            }), response.status_code
+        
+        result = response.json()
+        
+        # Check for successful response
+        if result.get('status') == 200:
+            identities = result.get('matches', [])
+            return jsonify({
+                "success": True,
+                "status": result.get('status'),
+                "matches": identities,
+                "count": len(identities)
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Identify unsuccessful",
+                "details": result
+            }), 400
+        
+    except requests.exceptions.Timeout:
+        return jsonify({
+            "error": "PDL API request timeout"
+        }), 504
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "error": f"PDL API request failed: {str(e)}"
+        }), 500
+    except Exception as e:
+        return jsonify({
+            "error": f"Unexpected error: {str(e)}"
         }), 500
 
 
