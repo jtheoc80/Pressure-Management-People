@@ -16,5 +16,30 @@ class Config:
 
     # Optional enrichment provider API keys
     CLEARBIT_API_KEY = os.environ.get("CLEARBIT_API_KEY")
-    PDL_API_KEY = os.environ.get("PDL_API_KEY")
+
+    # Support multiple common env var names for People Data Labs API key
+    # This helps when the secret name differs between local, GitHub, or Render.
+    _PDL_ENV_CANDIDATES = [
+        "PDL_API_KEY",
+        "PEOPLE_DATA_LABS_API_KEY",
+        "PEOPLE_DATA_LAB_API_KEY",
+        "PEOPLEDATALABS_API_KEY",
+        "PEOPLE_DATALABS_API_KEY",
+        "PDL_KEY",
+        "PDLAPIKEY",
+    ]
+
+    _pdl_key_value = None
+    _pdl_key_source = None
+    for _name in _PDL_ENV_CANDIDATES:
+        _val = os.environ.get(_name)
+        if _val:
+            _pdl_key_value = _val
+            _pdl_key_source = _name
+            break
+
+    PDL_API_KEY = _pdl_key_value
+    # Non-secret indicator for debugging which env var name was used
+    PDL_API_KEY_SOURCE = _pdl_key_source
+
     CRUNCHBASE_API_KEY = os.environ.get("CRUNCHBASE_API_KEY")
