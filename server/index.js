@@ -4,6 +4,25 @@ const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const fs = require('fs');
+
+// Attempt to load environment variables from common .env locations.
+// This makes local development easier and avoids relying solely on shell exports.
+try {
+  const dotenv = require('dotenv');
+  const dotenvPaths = [
+    path.join(__dirname, '..', '.env.local'),
+    path.join(__dirname, '..', '.env'),
+    path.join(__dirname, '..', 'orgchart_app', '.env'),
+  ];
+  for (const filePath of dotenvPaths) {
+    if (fs.existsSync(filePath)) {
+      dotenv.config({ path: filePath, override: false });
+    }
+  }
+} catch (_) {
+  // dotenv is optional; ignore if not installed
+}
 const {
   exportToJSON,
 } = require('./api-integrations');
@@ -11,6 +30,16 @@ const {
 const app = express();
 
 // Helper: robustly read PDL API key from multiple env var names
+const PDL_ENV_CANDIDATES = [
+  'PDL_API_KEY',
+  'PEOPLE_DATA_LABS_API_KEY',
+  'PEOPLE_DATA_LAB_API_KEY',
+  'PEOPLEDATALABS_API_KEY',
+  'PEOPLE_DATALABS_API_KEY',
+  'PDL_KEY',
+  'PDLAPIKEY',
+];
+
 function getEnvFirst(names) {
   for (const name of names) {
     if (process.env[name]) return process.env[name];
@@ -19,15 +48,14 @@ function getEnvFirst(names) {
 }
 
 function getPdlApiKey() {
-  return getEnvFirst([
-    'PDL_API_KEY',
-    'PEOPLE_DATA_LABS_API_KEY',
-    'PEOPLE_DATA_LAB_API_KEY',
-    'PEOPLEDATALABS_API_KEY',
-    'PEOPLE_DATALABS_API_KEY',
-    'PDL_KEY',
-    'PDLAPIKEY',
-  ]);
+  return getEnvFirst(PDL_ENV_CANDIDATES);
+}
+
+function getPdlApiKeySource() {
+  for (const name of PDL_ENV_CANDIDATES) {
+    if (process.env[name]) return name;
+  }
+  return undefined;
 }
 const PORT = process.env.PORT || 5000;
 
@@ -380,6 +408,8 @@ app.get('/api/enrich/providers', (req, res) => {
     zoominfo: Boolean(process.env.ZOOMINFO_API_KEY),
     apollo: Boolean(process.env.APOLLO_API_KEY),
     pdl: Boolean(getPdlApiKey()),
+    // Non-secret hint to help diagnose which env var was used in various envs
+    pdl_source: getPdlApiKeySource() || null,
   });
 });
 

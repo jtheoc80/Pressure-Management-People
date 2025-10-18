@@ -1,9 +1,25 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "orgchart.db"
+
+# Load environment variables from common .env locations for local/dev usage
+# Production platforms (e.g., Render) inject env vars directly and do not need this.
+_dotenv_candidates = [
+    BASE_DIR.parent / ".env.local",
+    BASE_DIR.parent / ".env",
+    BASE_DIR / ".env",
+]
+for _env_path in _dotenv_candidates:
+    try:
+        if _env_path.exists():
+            load_dotenv(dotenv_path=_env_path, override=False)
+    except Exception:
+        # Best-effort; ignore if python-dotenv is unavailable or file unreadable
+        pass
 
 
 class Config:
